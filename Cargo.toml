@@ -1,21 +1,22 @@
 [package]
-name = "git-remote"
+name = "git-browser"
 version = "0.1.0"
 edition = "2021"
 authors = ["Goudham Suresh <sgoudham@gmail.com>"]
-description = ""
+description = "A git sub-command to open your git repository in the web browser"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/sgoudham/git-remote"
 exclude = [".github/**"]
 
 [[bin]]
-name = "git-remote"
-path = "src/bin/git-remote.rs"
+name = "git-browser"
+path = "src/bin/git-browser.rs"
 
 [lib]
-name = "git_remote"
+name = "git_browser"
 path = "src/lib.rs"
 
 [dependencies]
-clap = { version = '3.1.18' }
+clap = { version = '3.1.18', features = ["cargo"] }
+webbrowser = { version = '0.7.1' }

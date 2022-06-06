@@ -1,20 +1,20 @@
 [package]
-name = "git-browser"
+name = "git-view"
 version = "0.1.0"
 edition = "2021"
 authors = ["Goudham Suresh <sgoudham@gmail.com>"]
-description = "A git sub-command to open your git repository in the web browser"
+description = "A git sub-command to view your git repository in the web browser"
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/sgoudham/git-browser"
+repository = "https://github.com/sgoudham/git-view"
 exclude = [".github/**"]
 
 [[bin]]
-name = "git-browser"
-path = "src/bin/git-browser.rs"
+name = "git-view"
+path = "src/bin/git-view.rs"
 
 [lib]
-name = "git_browser"
+name = "git_view"
 path = "src/lib.rs"
 
 [dependencies]

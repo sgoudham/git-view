@@ -1,13 +1,13 @@
 use std::process::Command;
 
-pub struct GitUpstream {
+pub struct GitView {
     remote: String,
     branch: Option<String>,
     is_commit: bool,
     is_print: bool,
 }
 
-impl GitUpstream {
+impl GitView {
     pub fn new(branch: Option<String>, remote: String, is_commit: bool, is_print: bool) -> Self {
         Self {
             remote,
@@ -22,6 +22,7 @@ impl GitUpstream {
         self.is_inside_git_repository()?;
         // Retrieve the current branch
         self.populate_branch()?;
+
 
         let git_url = Command::new("git")
             .args(["ls-remote", "--get-url", &self.remote])

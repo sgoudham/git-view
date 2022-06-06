@@ -1,2 +1,3 @@
-# git-remote
-A command line application to open your git repository on Github... written in Rust :D
+# git-browser
+
+A git sub-command to open your git repository in the web browser... written in Rust :D

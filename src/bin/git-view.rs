@@ -16,7 +16,7 @@ fn main() {
         .version(crate_version!())
         .author(crate_authors!())
         .about(crate_description!())
-        .long_about(None)
+        .long_about("")
         .arg(
             Arg::new("branch")
                 .help("The branch to view git repository on")
@@ -61,7 +61,7 @@ fn main() {
         matches.is_present("print"),
     );
 
-    if let Err(err) = git_view.open_upstream_repository() {
-        clap_panic!(err);
+    if let Err(app_error) = git_view.open_upstream_repository() {
+        clap_panic!(app_error.print());
     }
 }

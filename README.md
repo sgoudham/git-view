@@ -17,7 +17,8 @@ Are you frustrated from moving your hands away from the keyboard to open your gi
 
 > Me too!
 
-`git-view` allows you to do _just that._ 
+`git-view` allows you to do _just that._
+
 _Note: The use of a mouse or trackpad may be required to navigate the browser :P_
 
 ## Features

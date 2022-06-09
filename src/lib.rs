@@ -37,6 +37,11 @@ impl GitView {
         self.populate_remote()?;
 
         // TODO: Figure out how to default to 'master' or 'main' if branch doesn't exist on remote
+        //
+        // Current theory on how to get it working:
+        // 1. Run "git checkout" to check if there's a remote branch for your current local one (there should be no output if remote branch doesn't exist)
+        // 2. Then run "git rev-parse --abbrev-ref <remote>/HEAD" and split on the first '/' to get the current default branch
+        //      - Although, I think that this command isn't foolproof, it might be the best option though without trying to use some command line parsers
 
         // Retrieve the remote reference
         let remote_ref = self.get_remote_reference()?;
@@ -203,21 +208,45 @@ impl GitView {
      *  - [user@]host.xz:path/to/repo.git/
      */
     fn parse_git_url(&self, git_url: &str) -> Result<(String, String, String), AppError> {
-        match Url::parse(git_url) {
-            Ok(url) => Ok((
-                url.scheme().to_string(),
-                url.host_str()
-                    .map_or_else(|| "github.com", |host| host)
-                    .to_string(),
-                url.path()
-                    .trim_end_matches('/')
-                    .trim_end_matches(".git")
-                    .to_string(),
-            )),
-            Err(_) => Err(AppError::InvalidGitUrl(format!(
-                "Sorry, couldn't parse git url '{}'",
-                git_url
-            ))),
+        // rust-url cannot parse 'scp-like' urls -> https://github.com/servo/rust-url/issues/220
+        // Manually parse the url ourselves
+        if git_url.contains("://") {
+            match Url::parse(git_url) {
+                Ok(url) => Ok((
+                    url.scheme().to_string(),
+                    url.host_str()
+                        .map_or_else(|| "github.com", |host| host)
+                        .to_string(),
+                    url.path()
+                        .trim_start_matches('/')
+                        .trim_end_matches('/')
+                        .trim_end_matches(".git")
+                        .to_string(),
+                )),
+                Err(_) => Err(AppError::InvalidGitUrl(format!(
+                    "Sorry, couldn't parse git url '{}'",
+                    git_url
+                ))),
+            }
+        } else {
+            match git_url.split_once(':') {
+                Some((domain, path)) => {
+                    let protocol = "https";
+                    let path = path.trim_end_matches('/').trim_end_matches(".git");
+                    let split_domain = match domain.split_once('@') {
+                        Some((_username, dom)) => {
+                            dom
+                        }
+                        None => domain,
+                    };
+
+                    Ok((protocol.to_string(), split_domain.to_string(), path.to_string()))
+                }
+                None => Err(AppError::InvalidGitUrl(format!(
+                    "Sorry, couldn't parse git url '{}'",
+                    git_url
+                ))),
+            }
         }
     }
 }
@@ -238,6 +267,7 @@ fn stdout_to_string(bytes: &[u8]) -> Result<String, AppError> {
 #[cfg(test)]
 mod parse_git_url {
     use crate::{error::AppError, GitView};
+    use test_case::test_case;
 
     fn instantiate_handler() -> GitView {
         GitView::new(
@@ -248,32 +278,34 @@ mod parse_git_url {
         )
     }
 
-    #[test]
-    fn with_dot_git() -> Result<(), AppError> {
+    // http[s]://host.xz[:port]/path/to/repo.git/
+    #[test_case("https://github.com:8080/sgoudham/git-view.git" ; "with port")]
+    #[test_case("https://github.com/sgoudham/git-view.git" ; "normal")]
+    #[test_case("https://github.com/sgoudham/git-view.git/" ; "with trailing slash")]
+    fn https(git_url: &str) -> Result<(), AppError> {
         let handler = instantiate_handler();
 
-        let git_url_normal = "https://github.com/sgoudham/git-view.git";
-
-        let (protocol, domain, urlpath) = handler.parse_git_url(git_url_normal)?;
+        let (protocol, domain, urlpath) = handler.parse_git_url(git_url)?;
 
         assert_eq!(protocol, "https");
         assert_eq!(domain, "github.com");
-        assert_eq!(urlpath, "/sgoudham/git-view");
+        assert_eq!(urlpath, "sgoudham/git-view");
 
         Ok(())
     }
 
-    #[test]
-    fn with_dot_git_and_trailing_slash() -> Result<(), AppError> {
+    // [user@]host.xz:path/to/repo.git/
+    #[test_case("git@github.com:sgoudham/git-view.git" ; "with username")]
+    #[test_case("github.com:sgoudham/git-view.git" ; "normal")]
+    #[test_case("github.com:sgoudham/git-view.git/" ; "with trailing slash")]
+    fn ssh(git_url: &str) -> Result<(), AppError> {
         let handler = instantiate_handler();
 
-        let git_url_normal = "https://github.com/sgoudham/git-view.git/";
-
-        let (protocol, domain, urlpath) = handler.parse_git_url(git_url_normal)?;
+        let (protocol, domain, urlpath) = handler.parse_git_url(git_url)?;
 
         assert_eq!(protocol, "https");
         assert_eq!(domain, "github.com");
-        assert_eq!(urlpath, "/sgoudham/git-view");
+        assert_eq!(urlpath, "sgoudham/git-view");
 
         Ok(())
     }

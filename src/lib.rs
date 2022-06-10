@@ -1,8 +1,10 @@
 mod error;
+mod git;
 
 use std::process::Command;
 
-use error::AppError;
+use error::{AppError, ErrorType};
+use git::{Git, GitCommand, GitOutput};
 use url::Url;
 
 #[derive(Debug)]
@@ -30,11 +32,14 @@ impl GitView {
 
     pub fn open_upstream_repository(&mut self) -> Result<(), AppError> {
         // Exit out if we're not inside a git repository
-        self.is_inside_git_repository()?;
+        self.is_valid_repository(&Git::IsValidRepository)?;
         // Retrieve the current branch
-        self.populate_branch()?;
+        self.populate_branch(&Git::LocalBranch)?;
         // Retrieve the remote
-        self.populate_remote()?;
+        self.remote = Some(self.populate_remote(
+            &Git::DefaultRemote,
+            &Git::TrackedRemote(self.branch.as_ref().unwrap()),
+        )?);
 
         // TODO: Figure out how to default to 'master' or 'main' if branch doesn't exist on remote
         //
@@ -44,158 +49,95 @@ impl GitView {
         //      - Although, I think that this command isn't foolproof, it might be the best option though without trying to use some command line parsers
 
         // Retrieve the remote reference
-        let remote_ref = self.get_remote_reference()?;
+        let remote_ref =
+            self.get_remote_reference(&Git::UpstreamBranch(self.branch.as_ref().unwrap()))?;
         // Retrieve the full git_url
         // e.g https://github.com/sgoudham/git-view.git
-        let git_url = self.get_git_url()?;
-
+        let git_url = self.get_git_url(&Git::IsValidRemote(self.remote.as_ref().unwrap()))?;
         // Extract protocol, domain and urlpath
         let (protocol, domain, urlpath) = self.parse_git_url(&git_url)?;
+        // Generate final url to open in the web browser
+        // let final_url = self.generate_final_url(protocol, domain, urlpath);
 
         // Open the URL
         webbrowser::open(
-            format!("{}://{}{}/tree/{}", protocol, domain, urlpath, remote_ref).as_str(),
+            format!("{}://{}/{}/tree/{}", protocol, domain, urlpath, remote_ref).as_str(),
         )?;
 
         Ok(())
     }
 
-    fn is_inside_git_repository(&self) -> Result<(), AppError> {
-        let output = Command::new("git")
-            .arg("rev-parse")
-            .arg("--is-inside-work-tree")
-            .output()?;
-
-        if output.status.success() {
-            Ok(())
-        } else {
-            Err(AppError::MissingGitRepository(String::from(
-                "Looks like you're not in a valid git repository!",
-            )))
+    fn is_valid_repository(&self, command: &impl GitCommand) -> Result<(), AppError> {
+        match command.execute()? {
+            GitOutput::Ok(_) => Ok(()),
+            GitOutput::Err(_) => Err(AppError::new(
+                ErrorType::MissingGitRepository,
+                "Looks like you're not in a valid git repository!".to_string(),
+            )),
         }
     }
 
-    fn populate_branch(&mut self) -> Result<(), AppError> {
+    fn populate_branch(&mut self, command: &impl GitCommand) -> Result<(), AppError> {
         if self.branch.is_none() {
-            let branch = Command::new("git")
-                .arg("symbolic-ref")
-                .arg("-q")
-                .arg("--short")
-                .arg("HEAD")
-                .output()?;
-
-            if branch.status.success() {
-                match stdout_to_string(&branch.stdout) {
-                    Ok(str) => self.branch = Some(str),
-                    Err(_) => {
-                        return Err(AppError::InvalidUtf8(String::from(
-                            "Git branch is not valid UTF-8!",
-                        )))
-                    }
+            match command.execute()? {
+                GitOutput::Ok(output) => {
+                    self.branch = Some(output);
+                    Ok(())
                 }
-            } else {
-                return Err(AppError::CommandError(
-                    String::from_utf8_lossy(&branch.stderr).to_string(),
-                ));
-            }
-        }
-
-        Ok(())
-    }
-
-    fn get_remote_reference(&mut self) -> Result<String, AppError> {
-        let absolute_upstream_branch = Command::new("git")
-            .arg("config")
-            .arg(format!("branch.{}.merge", self.branch.as_ref().unwrap()))
-            .output()?;
-
-        if absolute_upstream_branch.status.success() {
-            match stdout_to_string(&absolute_upstream_branch.stdout) {
-                Ok(str) => Ok(str.trim_start_matches("refs/heads/").to_string()),
-                Err(_) => Err(AppError::InvalidUtf8(String::from(
-                    "Git upstream branch is not valid UTF-8!",
-                ))),
+                GitOutput::Err(err) => Err(AppError::new(ErrorType::CommandFailed, err)),
             }
         } else {
-            Ok(self.branch.as_ref().unwrap().to_string())
+            Ok(())
         }
     }
 
     /// Populates the remote variable within [`GitView`]
     /// User Given Remote -> Default Remote in Config -> Tracked Remote -> 'origin'
-    fn populate_remote(&mut self) -> Result<(), AppError> {
+    fn populate_remote(
+        &self,
+        default_remote: &impl GitCommand,
+        tracked_remote: &impl GitCommand,
+    ) -> Result<String, AppError> {
         // Priority goes to user given remote
         if self.remote.is_none() {
             // Priority then goes to the default remote
-            let default_remote = Command::new("git")
-                .arg("config")
-                .arg("open.default.remote")
-                .output()?;
-
-            if default_remote.status.success() {
-                return match stdout_to_string(&default_remote.stdout) {
-                    Ok(str) => {
-                        self.remote = Some(str);
-                        Ok(())
-                    }
-                    Err(_) => Err(AppError::InvalidUtf8(String::from(
-                        "Git default remote is not valid UTF-8!",
-                    ))),
-                };
-            }
-
-            // Priority then goes to the tracked remote
-            let tracked_remote = Command::new("git")
-                .arg("config")
-                .arg(format!("branch.{}.remote", self.branch.as_ref().unwrap()))
-                .output()?;
-
-            if tracked_remote.status.success() {
-                return match stdout_to_string(&tracked_remote.stdout) {
-                    Ok(str) => {
-                        self.remote = Some(str);
-                        Ok(())
-                    }
-                    Err(_) => Err(AppError::InvalidUtf8(String::from(
-                        "Git tracked remote is not valid UTF-8!",
-                    ))),
-                };
-            }
-
-            // Priority then goes to the default 'origin'
-            self.remote = Some(String::from("origin"));
-        }
-
-        Ok(())
-    }
-
-    fn get_git_url(&self) -> Result<String, AppError> {
-        let is_valid_remote = Command::new("git")
-            .arg("ls-remote")
-            .arg("--get-url")
-            .arg(self.remote.as_ref().unwrap())
-            .output()?;
-
-        if is_valid_remote.status.success() {
-            match stdout_to_string(&is_valid_remote.stdout) {
-                Ok(str) => {
-                    if &str != self.remote.as_ref().unwrap() {
-                        Ok(str)
-                    } else {
-                        Err(AppError::MissingGitRemote(format!(
-                            "Looks like your git remote isn't set for '{}'",
-                            self.remote.as_ref().unwrap(),
-                        )))
-                    }
-                }
-                Err(_) => Err(AppError::InvalidUtf8(String::from(
-                    "Git URL is not valid UTF-8!",
-                ))),
+            match default_remote.execute()? {
+                GitOutput::Ok(def) => Ok(def),
+                // Priority then goes to the tracked remote
+                GitOutput::Err(_) => match tracked_remote.execute()? {
+                    GitOutput::Ok(tracked) => Ok(tracked),
+                    // Default to the 'origin' remote
+                    GitOutput::Err(_) => Ok("origin".to_string()),
+                },
             }
         } else {
-            Err(AppError::CommandError(
-                String::from_utf8_lossy(&is_valid_remote.stderr).to_string(),
-            ))
+            Ok(self.remote.as_ref().unwrap().to_string())
+        }
+    }
+
+    fn get_remote_reference(&self, command: &impl GitCommand) -> Result<String, AppError> {
+        match command.execute()? {
+            GitOutput::Ok(output) => Ok(output.trim_start_matches("refs/heads/").to_string()),
+            GitOutput::Err(_) => Ok(self.branch.as_ref().unwrap().to_string()),
+        }
+    }
+
+    fn get_git_url(&self, command: &impl GitCommand) -> Result<String, AppError> {
+        match command.execute()? {
+            GitOutput::Ok(output) => {
+                if &output != self.remote.as_ref().unwrap() {
+                    Ok(output)
+                } else {
+                    Err(AppError::new(
+                        ErrorType::MissingGitRemote,
+                        format!(
+                            "Looks like your git remote isn't set for '{}'",
+                            self.remote.as_ref().unwrap()
+                        ),
+                    ))
+                }
+            }
+            GitOutput::Err(err) => Err(AppError::new(ErrorType::CommandFailed, err)),
         }
     }
 
@@ -210,6 +152,7 @@ impl GitView {
     fn parse_git_url(&self, git_url: &str) -> Result<(String, String, String), AppError> {
         // rust-url cannot parse 'scp-like' urls -> https://github.com/servo/rust-url/issues/220
         // Manually parse the url ourselves
+
         if git_url.contains("://") {
             match Url::parse(git_url) {
                 Ok(url) => Ok((
@@ -223,10 +166,10 @@ impl GitView {
                         .trim_end_matches(".git")
                         .to_string(),
                 )),
-                Err(_) => Err(AppError::InvalidGitUrl(format!(
-                    "Sorry, couldn't parse git url '{}'",
-                    git_url
-                ))),
+                Err(_) => Err(AppError::new(
+                    ErrorType::InvalidGitUrl,
+                    format!("Sorry, couldn't parse git url '{}'", git_url),
+                )),
             }
         } else {
             match git_url.split_once(':') {
@@ -234,34 +177,63 @@ impl GitView {
                     let protocol = "https";
                     let path = path.trim_end_matches('/').trim_end_matches(".git");
                     let split_domain = match domain.split_once('@') {
-                        Some((_username, dom)) => {
-                            dom
-                        }
+                        Some((_username, dom)) => dom,
                         None => domain,
                     };
 
-                    Ok((protocol.to_string(), split_domain.to_string(), path.to_string()))
+                    Ok((
+                        protocol.to_string(),
+                        split_domain.to_string(),
+                        path.to_string(),
+                    ))
                 }
-                None => Err(AppError::InvalidGitUrl(format!(
-                    "Sorry, couldn't parse git url '{}'",
-                    git_url
-                ))),
+                None => Err(AppError::new(
+                    ErrorType::InvalidGitUrl,
+                    format!("Sorry, couldn't parse git url '{}'", git_url),
+                )),
             }
         }
     }
+
+    fn generate_final_url(&self, protocol: String, domain: String, urlpath: String) -> String {
+        todo!();
+    }
 }
 
-fn stdout_to_string(bytes: &[u8]) -> Result<String, AppError> {
-    let mut utf_8_string = String::from(std::str::from_utf8(bytes)?.trim());
+#[cfg(test)]
+mod is_valid_repository {
+    use std::process::{ExitStatus, Output};
 
-    if utf_8_string.ends_with('\n') {
-        utf_8_string.pop();
-        if utf_8_string.ends_with('\r') {
-            utf_8_string.pop();
-        }
+    use crate::{git::MockGitCommand, GitView};
+
+    fn instantiate_handler() -> GitView {
+        GitView::new(
+            Some(String::from("main")),
+            Some(String::from("origin")),
+            Some(String::from("latest")),
+            false,
+        )
     }
 
-    Ok(utf_8_string)
+    // #[test]
+    fn yes() {
+        let handler = instantiate_handler();
+        let mut mock = MockGitCommand::new();
+        let is_valid_repository = handler.is_valid_repository(&mock);
+
+        assert!(is_valid_repository.is_ok());
+    }
+
+    // #[test]
+    fn no() {
+        let handler = instantiate_handler();
+        let mut mock = MockGitCommand::new();
+        mock.expect_execute().never();
+
+        let is_valid_repository = handler.is_valid_repository(&mock);
+
+        assert!(is_valid_repository.is_err());
+    }
 }
 
 #[cfg(test)]
@@ -313,13 +285,13 @@ mod parse_git_url {
     #[test]
     fn invalid_git_url() {
         let handler = instantiate_handler();
-
         let git_url_normal = "This isn't a git url";
 
         let error = handler.parse_git_url(git_url_normal);
+
         assert!(error.is_err());
         assert_eq!(
-            error.unwrap_err().print(),
+            error.unwrap_err().error_str,
             "Sorry, couldn't parse git url 'This isn't a git url'"
         );
     }

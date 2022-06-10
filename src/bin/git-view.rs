@@ -62,6 +62,6 @@ fn main() {
     );
 
     if let Err(app_error) = git_view.open_upstream_repository() {
-        clap_panic!(app_error.print());
+        clap_panic!(app_error.error_str);
     }
 }

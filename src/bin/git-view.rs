@@ -55,9 +55,9 @@ fn main() {
 
     let matches = matches.get_matches();
     let mut git_view = GitView::new(
-        matches.value_of("branch").map(str::to_string),
-        matches.value_of("remote").map(str::to_string),
-        matches.value_of("commit").map(str::to_string),
+        matches.value_of("branch"),
+        matches.value_of("remote"),
+        matches.value_of("commit"),
         matches.is_present("print"),
     );
 

@@ -1,3 +1,4 @@
+use core::fmt;
 use mockall::automock;
 use std::process::{Command, Output};
 
@@ -10,6 +11,19 @@ pub(crate) enum Git<'a> {
     TrackedRemote(&'a str),
     UpstreamBranch(&'a str),
     IsValidRemote(&'a str),
+}
+
+#[derive(Debug)]
+pub(crate) enum Domain {
+    Github(String),
+    BitBucket(String),
+}
+
+#[derive(Debug)]
+pub(crate) struct Url {
+    pub(crate) protocol: String,
+    pub(crate) domain: Domain,
+    pub(crate) path: String,
 }
 
 pub(crate) enum GitOutput {
@@ -76,6 +90,40 @@ impl<'a> GitCommand for Git<'a> {
             Ok(GitOutput::Ok(self.trim(&command.stdout)?))
         } else {
             Ok(GitOutput::Err(self.trim(&command.stderr)?))
+        }
+    }
+}
+
+impl Url {
+    pub(crate) fn new(protocol: &str, domain: Domain, path: &str) -> Self {
+        Self {
+            protocol: protocol.to_owned(),
+            domain,
+            path: path.to_owned(),
+        }
+    }
+}
+
+impl Domain {
+    pub(crate) fn from_str(s: &str) -> Self {
+        if s == "bitbucket.org" {
+            Domain::BitBucket(s.to_owned())
+        } else {
+            Domain::Github(s.to_owned())
+        }
+    }
+}
+
+impl PartialEq for Domain {
+    fn eq(&self, other: &Self) -> bool {
+        self.to_string() == other.to_string()
+    }
+}
+
+impl fmt::Display for Domain {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Domain::Github(str) | Domain::BitBucket(str) => write!(f, "{}", str),
         }
     }
 }

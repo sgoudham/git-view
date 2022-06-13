@@ -15,8 +15,8 @@ pub(crate) enum Git<'a> {
 
 #[derive(Debug)]
 pub(crate) enum Domain {
-    Github(String),
-    BitBucket(String),
+    GitHub,
+    BitBucket,
 }
 
 #[derive(Debug)]
@@ -107,9 +107,9 @@ impl Url {
 impl Domain {
     pub(crate) fn from_str(s: &str) -> Self {
         if s == "bitbucket.org" {
-            Domain::BitBucket(s.to_owned())
+            Domain::BitBucket
         } else {
-            Domain::Github(s.to_owned())
+            Domain::GitHub
         }
     }
 }
@@ -123,7 +123,8 @@ impl PartialEq for Domain {
 impl fmt::Display for Domain {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Domain::Github(str) | Domain::BitBucket(str) => write!(f, "{}", str),
+            Domain::GitHub => write!(f, "github.com"),
+            Domain::BitBucket => write!(f, "bitbucket.org"),
         }
     }
 }

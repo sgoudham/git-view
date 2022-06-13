@@ -19,7 +19,7 @@ fn main() {
         .long_about("")
         .arg(
             Arg::new("branch")
-                .help("The branch to view git repository on")
+                .help("The branch to view git repository on [default: current branch]")
                 .short('b')
                 .long("branch")
                 .value_name("name")
@@ -28,7 +28,7 @@ fn main() {
         )
         .arg(
             Arg::new("remote")
-                .help("The remote to view git repository on")
+                .help("The remote to view git repository on [default: default remote]")
                 .short('r')
                 .long("remote")
                 .value_name("name")
@@ -37,7 +37,7 @@ fn main() {
         )
         .arg(
             Arg::new("commit")
-                .help("The commit to view git repository on")
+                .help("The commit to view git repository on [default: latest]")
                 .short('c')
                 .long("commit")
                 .value_name("hash")
@@ -46,11 +46,18 @@ fn main() {
                 .display_order(3),
         )
         .arg(
+            Arg::new("issue")
+                .help("Attempt to parse issue number and open issue link")
+                .short('i')
+                .long("issue")
+                .display_order(4),
+        )
+        .arg(
             Arg::new("print")
-                .help("Print the URL (doesn't open browser)")
+                .help("Don't open browser and print the URL")
                 .short('p')
                 .long("print")
-                .display_order(4),
+                .display_order(5),
         );
 
     let matches = matches.get_matches();
@@ -58,10 +65,11 @@ fn main() {
         matches.value_of("branch"),
         matches.value_of("remote"),
         matches.value_of("commit"),
+        matches.is_present("issue"),
         matches.is_present("print"),
     );
 
-    if let Err(app_error) = git_view.open_upstream_repository() {
+    if let Err(app_error) = git_view.view_repository() {
         clap_panic!(app_error.error_str);
     }
 }

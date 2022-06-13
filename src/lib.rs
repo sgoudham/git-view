@@ -11,6 +11,7 @@ pub struct GitView<'a> {
     remote: Option<&'a str>,
     branch: Option<&'a str>,
     commit: Option<&'a str>,
+    is_issue: bool,
     is_print: bool,
 }
 
@@ -19,17 +20,19 @@ impl<'a> GitView<'a> {
         branch: Option<&'a str>,
         remote: Option<&'a str>,
         commit: Option<&'a str>,
+        is_issue: bool,
         is_print: bool,
     ) -> Self {
         Self {
             remote,
             branch,
             commit,
+            is_issue,
             is_print,
         }
     }
 
-    pub fn open_upstream_repository(&mut self) -> Result<(), AppError> {
+    pub fn view_repository(&mut self) -> Result<(), AppError> {
         // Exit out if we're not inside a git repository
         self.is_valid_repository(&Git::IsValidRepository)?;
         // Retrieve the current branch
@@ -52,16 +55,14 @@ impl<'a> GitView<'a> {
         // Extract protocol, domain and urlpath
         let url = self.parse_git_url(&git_url)?;
         // Generate final url to open in the web browser
-        // let final_url = self.generate_final_url(protocol, domain, urlpath);
+        let final_url = self.generate_final_url(&remote_ref, &url);
 
-        // Open the URL
-        webbrowser::open(
-            format!(
-                "{}://{}/{}/tree/{}",
-                url.protocol, url.domain, url.path, remote_ref
-            )
-            .as_str(),
-        )?;
+        // Display OR Open the URL
+        if self.is_print {
+            println!("{}", final_url);
+        } else {
+            webbrowser::open(final_url.as_str())?;
+        }
 
         Ok(())
     }
@@ -80,6 +81,8 @@ impl<'a> GitView<'a> {
         if self.branch.is_none() {
             match command.execute()? {
                 GitOutput::Ok(output) => Ok(Cow::Owned(output)),
+                // Don't error on this, instead make a new enum Branch/NotBranch and match on it
+                // later
                 GitOutput::Err(err) => Err(AppError::new(ErrorType::CommandFailed, err)),
             }
         } else {
@@ -120,11 +123,20 @@ impl<'a> GitView<'a> {
             GitOutput::Ok(output) => Ok(Cow::Owned(
                 output.trim_start_matches("refs/heads/").to_string(),
             )),
+            // So as explained above, branch might not exist either
+            // Instead of returning branch this early, match on the aforementioned enum above
+            //
+            // Branch:
+            // Just do what you're doing already and `Cow::Borrowed(branch)`
+            //
+            // NotBranch:
+            // Check to see if the user is on a tag or a specific commit hash. If all
+            // else fails THEN error out
             GitOutput::Err(_) => Ok(Cow::Borrowed(branch)),
         }
     }
 
-    fn get_git_url(&self, remote: &'a str, command: &impl GitCommand) -> Result<String, AppError> {
+    fn get_git_url(&self, remote: &str, command: &impl GitCommand) -> Result<String, AppError> {
         match command.execute()? {
             GitOutput::Ok(output) => {
                 if output != remote {
@@ -187,8 +199,57 @@ impl<'a> GitView<'a> {
         }
     }
 
-    fn generate_final_url(&self, protocol: String, domain: String, urlpath: String) -> String {
-        todo!();
+    fn generate_final_url(&self, remote_ref: &str, url: &Url) -> String {
+        let branch_ref = match &url.domain {
+            Domain::GitHub => {
+                if self.is_issue {
+                    format!("/issues/{}", capture_digits(remote_ref))
+                } else {
+                    format!("/tree/{}", escape_ascii_chars(remote_ref))
+                }
+            }
+            Domain::BitBucket => todo!(),
+        };
+
+        let mut open_url = format!("{}://{}/{}", url.protocol, url.domain, url.path);
+
+        // if self.commit.unwrap() == "latest" {
+        //     ()
+        // } else {
+        //     ()
+        // }
+
+        if remote_ref == "master" || remote_ref == "main" {
+            open_url
+        } else {
+            open_url.push_str(&branch_ref);
+            open_url
+        }
+    }
+}
+
+fn capture_digits(remote_ref: &str) -> String {
+    todo!()
+}
+
+fn escape_ascii_chars(remote_ref: &str) -> Cow<'_, str> {
+    // I could use this below but I wanted to be more comfortable with Cow
+    // branch.replace('%', "%25").replace('#', "%23");
+
+    if remote_ref.contains(['%', '#']) {
+        let mut escaped_str = String::with_capacity(remote_ref.len());
+
+        for char in remote_ref.chars() {
+            match char {
+                '%' => escaped_str.push_str("%25"),
+                '#' => escaped_str.push_str("%23"),
+                _ => escaped_str.push(char),
+            };
+        }
+
+        Cow::Owned(escaped_str)
+    } else {
+        Cow::Borrowed(remote_ref)
     }
 }
 
@@ -197,11 +258,10 @@ mod lib_tests {
     use crate::GitView;
 
     fn instantiate_handler() -> GitView<'static> {
-        GitView::new(Some("main"), Some("origin"), Some("latest"), false)
+        GitView::new(Some("main"), Some("origin"), None, false, false)
     }
 
     mod is_valid_repository {
-
         use crate::{
             error::ErrorType,
             git::{GitOutput, MockGitCommand},

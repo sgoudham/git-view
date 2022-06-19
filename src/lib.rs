@@ -48,6 +48,7 @@ impl<'a> GitView<'a> {
         let remote = self.populate_remote(&local, &git)?;
         // Retrieve the remote reference
         let remote_ref = self.get_remote_reference(&local, &git)?;
+
         // Retrieve the full git_url
         // e.g https://github.com/sgoudham/git-view.git
         let git_url = self.get_git_url(&remote, &git)?;
@@ -266,8 +267,29 @@ impl<'a> GitView<'a> {
     }
 }
 
-fn capture_digits(remote_ref: &str) -> String {
-    todo!()
+fn capture_digits(remote_ref: &str) -> &str {
+    let mut start = 0;
+    let mut end = 0;
+    let mut found = false;
+
+    for (indice, grapheme) in remote_ref.char_indices() {
+        if found {
+            if grapheme.is_numeric() {
+                end = indice;
+            } else {
+                break;
+            }
+        } else if grapheme.is_numeric() {
+            start = indice;
+            found = true;
+        }
+    }
+
+    if found {
+        &remote_ref[start..=end]
+    } else {
+        remote_ref
+    }
 }
 
 fn escape_ascii_chars(remote_ref: &str) -> Cow<'_, str> {
@@ -355,10 +377,9 @@ mod lib_tests {
         use crate::{error::AppError, lib_tests::instantiate_handler};
         use test_case::test_case;
 
-        // http[s]://host.xz[:port]/path/to/repo.git/
         #[test_case("https://github.com:8080/sgoudham/git-view.git" ; "with port")]
-        #[test_case("https://github.com/sgoudham/git-view.git" ; "normal")]
-        #[test_case("https://github.com/sgoudham/git-view.git/" ; "with trailing slash")]
+        #[test_case("https://github.com/sgoudham/git-view.git"      ; "normal")]
+        #[test_case("https://github.com/sgoudham/git-view.git/"     ; "with trailing slash")]
         fn https(git_url: &str) -> Result<(), AppError> {
             let handler = instantiate_handler();
 
@@ -371,11 +392,10 @@ mod lib_tests {
             Ok(())
         }
 
-        // [user@]host.xz:path/to/repo.git/
-        #[test_case("git@github.com:sgoudham/git-view.git" ; "with username")]
-        #[test_case("github.com:sgoudham/git-view.git" ; "normal")]
-        #[test_case("github.com:sgoudham/git-view.git/" ; "with trailing slash")]
-        fn ssh(git_url: &str) -> Result<(), AppError> {
+        #[test_case("git@github.com:sgoudham/git-view.git"  ; "with username")]
+        #[test_case("github.com:sgoudham/git-view.git"      ; "normal")]
+        #[test_case("github.com:sgoudham/git-view.git/"     ; "with trailing slash")]
+        fn scp_like(git_url: &str) -> Result<(), AppError> {
             let handler = instantiate_handler();
 
             let url = handler.parse_git_url(git_url)?;
@@ -399,6 +419,39 @@ mod lib_tests {
                 error.unwrap_err().error_str,
                 "Sorry, couldn't parse git url 'This isn't a git url'"
             );
+        }
+    }
+
+    mod capture_digits {
+        use test_case::test_case;
+
+        use crate::capture_digits;
+
+        #[test_case("TICKET-WITH-NO-NUMBERS",   "TICKET-WITH-NO-NUMBERS"    ; "with no numbers")]
+        #[test_case("🥵🥵Hazel🥵-1234🥵🥵",     "1234"                      ; "with emojis")]
+        #[test_case("TICKET-1234-To-V10",       "1234"                      ; "with multiple issue numbers")]
+        #[test_case("TICKET-1234",              "1234"                      ; "with issue number at end")]
+        #[test_case("1234-TICKET",              "1234"                      ; "with issue number at start")]
+        #[test_case("1234",                     "1234"                      ; "with no letters")]
+        fn branch(input: &str, expected_remote_ref: &str) {
+            let actual_remote_ref = capture_digits(input);
+            assert_eq!(actual_remote_ref, expected_remote_ref);
+        }
+    }
+
+    mod escape_ascii_chars {
+        use test_case::test_case;
+
+        use crate::escape_ascii_chars;
+
+        #[test_case("🥵🥵Hazel🥵-%1234#🥵🥵",   "🥵🥵Hazel🥵-%251234%23🥵🥵"    ; "with emojis")]
+        #[test_case("TICKET-%1234#",            "TICKET-%251234%23"             ; "with hashtag and percentage")]
+        #[test_case("TICKET-%1234",             "TICKET-%251234"                ; "with percentage")]
+        #[test_case("TICKET-#1234",             "TICKET-%231234"                ; "with hashtag")]
+        #[test_case("TICKET",                   "TICKET"                        ; "with only alphabet")]
+        fn branch(input: &str, expected_remote_ref: &str) {
+            let actual_remote_ref = escape_ascii_chars(input);
+            assert_eq!(actual_remote_ref, expected_remote_ref);
         }
     }
 }

@@ -8,6 +8,7 @@ use git::{Domain, GitOutput, GitTrait, Url};
 
 pub use git::Git;
 
+#[derive(Debug, PartialEq)]
 enum Local<'a> {
     Branch(Cow<'a, str>),
     NotBranch,
@@ -43,11 +44,11 @@ impl<'a> GitView<'a> {
         // Exit out if we're not inside a git repository
         self.is_valid_repository(&git)?;
         // Retrieve the current local ref (branch or not branch)
-        let local = self.get_local_ref(&git)?;
+        let local_ref = self.get_local_ref(&git)?;
         // Retrieve the remote
-        let remote = self.populate_remote(&local, &git)?;
+        let remote = self.populate_remote(&local_ref, &git)?;
         // Retrieve the remote reference
-        let remote_ref = self.get_remote_reference(&local, &git)?;
+        let remote_ref = self.get_remote_reference(&local_ref, &git)?;
 
         // Retrieve the full git_url
         // e.g https://github.com/sgoudham/git-view.git
@@ -272,14 +273,14 @@ fn capture_digits(remote_ref: &str) -> &str {
     let mut end = 0;
     let mut found = false;
 
-    for (indice, grapheme) in remote_ref.char_indices() {
+    for (indice, char) in remote_ref.char_indices() {
         if found {
-            if grapheme.is_numeric() {
+            if char.is_numeric() {
                 end = indice;
             } else {
                 break;
             }
-        } else if grapheme.is_numeric() {
+        } else if char.is_numeric() {
             start = indice;
             found = true;
         }
@@ -362,15 +363,62 @@ mod lib_tests {
     }
 
     mod get_local_ref {
+        use std::borrow::Cow;
+
+        use crate::{
+            git::{GitOutput, MockGitTrait},
+            GitView, Local,
+        };
+
+        fn handler_with_branch<'a>() -> GitView<'a> {
+            GitView::new(Some("main"), None, None, false, false)
+        }
+
+        fn handler_without_branch<'a>() -> GitView<'a> {
+            GitView::new(None, None, None, false, false)
+        }
 
         #[test]
-        fn user_given_branch() {}
+        fn user_given_branch() {
+            let handler = handler_with_branch();
+            let mock = MockGitTrait::default();
+            let expected_local_ref = Ok(Local::Branch(Cow::Borrowed("main")));
+
+            let actual_local_ref = handler.get_local_ref(&mock);
+
+            assert!(actual_local_ref.is_ok());
+            assert_eq!(actual_local_ref, expected_local_ref);
+        }
 
         #[test]
-        fn is_branch() {}
+        fn is_branch() {
+            let handler = handler_without_branch();
+            let mut mock = MockGitTrait::default();
+            let expected_local_ref = Ok(Local::Branch(Cow::Borrowed("dev")));
+
+            mock.expect_get_local_branch()
+                .returning(|| Ok(GitOutput::Ok("dev".into())));
+
+            let actual_local_ref = handler.get_local_ref(&mock);
+
+            assert!(actual_local_ref.is_ok());
+            assert_eq!(actual_local_ref, expected_local_ref);
+        }
 
         #[test]
-        fn is_not_branch() {}
+        fn is_not_branch() {
+            let handler = handler_without_branch();
+            let mut mock = MockGitTrait::default();
+            let expected_local_ref = Ok(Local::NotBranch);
+
+            mock.expect_get_local_branch()
+                .returning(|| Ok(GitOutput::Err("Error".into())));
+
+            let actual_local_ref = handler.get_local_ref(&mock);
+
+            assert!(actual_local_ref.is_ok());
+            assert_eq!(actual_local_ref, expected_local_ref);
+        }
     }
 
     mod parse_git_url {

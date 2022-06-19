@@ -11,6 +11,7 @@ pub(crate) enum GitCommand<'a> {
     DefaultRemote,
     TrackedRemote(&'a str),
     UpstreamBranch(&'a str),
+    DefaultBranch(&'a str),
     IsValidRemote(&'a str),
     CurrentTag,
     CurrentCommit,
@@ -44,6 +45,7 @@ pub trait GitTrait {
     fn get_default_remote(&self) -> Result<GitOutput, AppError>;
     fn get_tracked_remote(&self, tracked: &str) -> Result<GitOutput, AppError>;
     fn get_upstream_branch(&self, branch: &str) -> Result<GitOutput, AppError>;
+    fn get_default_branch(&self, remote: &str) -> Result<GitOutput, AppError>;
     fn is_valid_remote(&self, remote: &str) -> Result<GitOutput, AppError>;
     fn get_current_tag(&self) -> Result<GitOutput, AppError>;
     fn get_current_commit(&self) -> Result<GitOutput, AppError>;
@@ -68,6 +70,10 @@ impl GitTrait for Git {
 
     fn get_upstream_branch(&self, branch: &str) -> Result<GitOutput, AppError> {
         execute(command(GitCommand::UpstreamBranch(branch))?)
+    }
+
+    fn get_default_branch(&self, remote: &str) -> Result<GitOutput, AppError> {
+        execute(command(GitCommand::DefaultBranch(remote))?)
     }
 
     fn is_valid_remote(&self, remote: &str) -> Result<GitOutput, AppError> {
@@ -106,6 +112,11 @@ fn command(git_command: GitCommand) -> Result<Output, std::io::Error> {
         GitCommand::UpstreamBranch(branch) => Command::new("git")
             .arg("config")
             .arg(format!("branch.{}.merge", branch))
+            .output(),
+        GitCommand::DefaultBranch(remote) => Command::new("git")
+            .arg("rev-parse")
+            .arg("--abbrev-ref")
+            .arg(format!("{}/HEAD", remote))
             .output(),
         GitCommand::IsValidRemote(remote) => Command::new("git")
             .arg("ls-remote")

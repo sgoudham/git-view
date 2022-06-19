@@ -54,7 +54,7 @@ impl<'a> GitView<'a> {
         // Extract protocol, domain and urlpath
         let url = self.parse_git_url(&git_url)?;
         // Generate final url to open in the web browser
-        let final_url = self.generate_final_url(&remote_ref, &url);
+        let final_url = self.generate_final_url(&remote_ref, &url, &git)?;
 
         // Display OR Open the URL
         if self.is_print {
@@ -222,13 +222,30 @@ impl<'a> GitView<'a> {
         }
     }
 
-    fn generate_final_url(&self, remote_ref: &str, url: &Url) -> String {
-        // if self.commit.unwrap() == "latest" {
-        //     ()
-        // } else {
-        //     ()
-        // }
+    fn generate_final_url(
+        &self,
+        remote_ref: &str,
+        url: &Url,
+        git: &impl GitTrait,
+    ) -> Result<String, AppError> {
+        let mut open_url = format!("{}://{}/{}", url.protocol, url.domain, url.path);
 
+        // Handle commit flag
+        if let Some(commit) = self.commit {
+            if commit == "latest" {
+                let commit_hash = match git.get_current_commit()? {
+                    GitOutput::Ok(hash) => Ok(hash),
+                    GitOutput::Err(err) => Err(AppError::new(ErrorType::CommandFailed, err)),
+                }?;
+                open_url.push_str(format!("/tree/{}", commit_hash).as_str());
+            } else {
+                open_url.push_str(format!("/tree/{}", commit).as_str());
+            }
+
+            return Ok(open_url);
+        }
+
+        // Handle issue flag and no flags
         let branch_ref = match &url.domain {
             Domain::GitHub => {
                 if self.is_issue {
@@ -240,13 +257,11 @@ impl<'a> GitView<'a> {
             Domain::BitBucket => todo!(),
         };
 
-        let mut open_url = format!("{}://{}/{}", url.protocol, url.domain, url.path);
-
         if remote_ref == "master" || remote_ref == "main" {
-            open_url
+            Ok(open_url)
         } else {
             open_url.push_str(&branch_ref);
-            open_url
+            Ok(open_url)
         }
     }
 }

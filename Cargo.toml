@@ -21,7 +21,8 @@ path = "src/lib.rs"
 clap = { version = '3.1.18', features = ["cargo"] }
 url = { version = '2.2.2' }
 webbrowser = { version = '0.7.1' }
-mockall = { version = '0.11.1' }
+unicode-segmentation = { version = "1.9.0" }
 
 [dev-dependencies]
 test-case = { version = '2.1.0' }
+mockall = { version = '0.11.1' }

@@ -2,6 +2,7 @@ use std::panic::set_hook;
 
 use clap::{command, crate_authors, crate_description, crate_version, Arg, Command, ErrorKind};
 use git_view::GitView;
+use git_view::Git;
 
 macro_rules! clap_panic {
     ($e:expr) => {
@@ -69,7 +70,7 @@ fn main() {
         matches.is_present("print"),
     );
 
-    if let Err(app_error) = git_view.view_repository() {
+    if let Err(app_error) = git_view.view_repository(Git) {
         clap_panic!(app_error.error_str);
     }
 }

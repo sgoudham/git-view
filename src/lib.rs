@@ -4,7 +4,14 @@ mod git;
 use std::borrow::Cow;
 
 use error::{AppError, ErrorType};
-use git::{Domain, Git, GitCommand, GitOutput, Url};
+use git::{Domain, GitOutput, GitTrait, Url};
+
+pub use git::Git;
+
+enum Local<'a> {
+    Branch(Cow<'a, str>),
+    NotBranch,
+}
 
 #[derive(Debug)]
 pub struct GitView<'a> {
@@ -32,26 +39,18 @@ impl<'a> GitView<'a> {
         }
     }
 
-    pub fn view_repository(&mut self) -> Result<(), AppError> {
+    pub fn view_repository(&mut self, git: impl GitTrait) -> Result<(), AppError> {
         // Exit out if we're not inside a git repository
-        self.is_valid_repository(&Git::IsValidRepository)?;
-        // Retrieve the current branch
-        let branch = self.populate_branch(&Git::LocalBranch)?;
+        self.is_valid_repository(&git)?;
+        // Retrieve the current local ref (branch or not branch)
+        let local = self.get_local_ref(&git)?;
         // Retrieve the remote
-        let remote = self.populate_remote(&Git::DefaultRemote, &Git::TrackedRemote(&branch))?;
-
-        // TODO: Figure out how to default to 'master' or 'main' if branch doesn't exist on remote
-        //
-        // Current theory on how to get it working:
-        // 1. Run "git checkout" to check if there's a remote branch for your current local one (there should be no output if remote branch doesn't exist)
-        // 2. Then run "git rev-parse --abbrev-ref <remote>/HEAD" and split on the first '/' to get the current default branch
-        //      - Although, I think that this command isn't foolproof, it might be the best option though without trying to use some command line parsers
-
+        let remote = self.populate_remote(&local, &git)?;
         // Retrieve the remote reference
-        let remote_ref = self.get_remote_reference(&branch, &Git::UpstreamBranch(&branch))?;
+        let remote_ref = self.get_remote_reference(&local, &git)?;
         // Retrieve the full git_url
         // e.g https://github.com/sgoudham/git-view.git
-        let git_url = self.get_git_url(&remote, &Git::IsValidRemote(&remote))?;
+        let git_url = self.get_git_url(&remote, &git)?;
         // Extract protocol, domain and urlpath
         let url = self.parse_git_url(&git_url)?;
         // Generate final url to open in the web browser
@@ -67,8 +66,8 @@ impl<'a> GitView<'a> {
         Ok(())
     }
 
-    fn is_valid_repository(&self, command: &impl GitCommand) -> Result<(), AppError> {
-        match command.execute()? {
+    fn is_valid_repository(&self, git: &impl GitTrait) -> Result<(), AppError> {
+        match git.is_valid_repository()? {
             GitOutput::Ok(_) => Ok(()),
             GitOutput::Err(_) => Err(AppError::new(
                 ErrorType::MissingGitRepository,
@@ -77,16 +76,14 @@ impl<'a> GitView<'a> {
         }
     }
 
-    fn populate_branch(&self, command: &impl GitCommand) -> Result<Cow<'_, str>, AppError> {
+    fn get_local_ref(&self, git: &impl GitTrait) -> Result<Local, AppError> {
         if self.branch.is_none() {
-            match command.execute()? {
-                GitOutput::Ok(output) => Ok(Cow::Owned(output)),
-                // Don't error on this, instead make a new enum Branch/NotBranch and match on it
-                // later
-                GitOutput::Err(err) => Err(AppError::new(ErrorType::CommandFailed, err)),
+            match git.get_local_branch()? {
+                GitOutput::Ok(output) => Ok(Local::Branch(Cow::Owned(output))),
+                GitOutput::Err(_) => Ok(Local::NotBranch),
             }
         } else {
-            Ok(Cow::Borrowed(self.branch.as_ref().unwrap()))
+            Ok(Local::Branch(Cow::Borrowed(self.branch.as_ref().unwrap())))
         }
     }
 
@@ -94,20 +91,25 @@ impl<'a> GitView<'a> {
     /// User Given Remote -> Default Remote in Config -> Tracked Remote -> 'origin'
     fn populate_remote(
         &self,
-        default_remote: &impl GitCommand,
-        tracked_remote: &impl GitCommand,
+        local: &Local,
+        git: &impl GitTrait,
     ) -> Result<Cow<'_, str>, AppError> {
         // Priority goes to user given remote
         if self.remote.is_none() {
-            // Priority then goes to the default remote
-            match default_remote.execute()? {
-                GitOutput::Ok(def) => Ok(Cow::Owned(def)),
-                // Priority then goes to the tracked remote
-                GitOutput::Err(_) => match tracked_remote.execute()? {
-                    GitOutput::Ok(tracked) => Ok(Cow::Owned(tracked)),
-                    // Default to the 'origin' remote
-                    GitOutput::Err(_) => Ok(Cow::Owned("origin".into())),
-                },
+            match local {
+                Local::Branch(branch) => {
+                    // Priority then goes to the default remote
+                    match git.get_default_remote()? {
+                        GitOutput::Ok(def) => Ok(Cow::Owned(def)),
+                        // Priority then goes to the tracked remote
+                        GitOutput::Err(_) => match git.get_tracked_remote(branch)? {
+                            GitOutput::Ok(tracked) => Ok(Cow::Owned(tracked)),
+                            // Default to the 'origin' remote
+                            GitOutput::Err(_) => Ok(Cow::Owned("origin".into())),
+                        },
+                    }
+                }
+                Local::NotBranch => Ok(Cow::Owned("origin".into())),
             }
         } else {
             Ok(Cow::Borrowed(self.remote.as_ref().unwrap()))
@@ -116,28 +118,49 @@ impl<'a> GitView<'a> {
 
     fn get_remote_reference(
         &self,
-        branch: &'a str,
-        command: &impl GitCommand,
+        local: &'a Local,
+        git: &impl GitTrait,
     ) -> Result<Cow<'a, str>, AppError> {
-        match command.execute()? {
-            GitOutput::Ok(output) => Ok(Cow::Owned(
-                output.trim_start_matches("refs/heads/").to_string(),
-            )),
-            // So as explained above, branch might not exist either
-            // Instead of returning branch this early, match on the aforementioned enum above
-            //
-            // Branch:
-            // Just do what you're doing already and `Cow::Borrowed(branch)`
-            //
-            // NotBranch:
-            // Check to see if the user is on a tag or a specific commit hash. If all
-            // else fails THEN error out
-            GitOutput::Err(_) => Ok(Cow::Borrowed(branch)),
+        match local {
+            Local::Branch(branch) => {
+                match git.get_upstream_branch(branch)? {
+                    GitOutput::Ok(output) => Ok(Cow::Owned(
+                        output.trim_start_matches("refs/heads/").to_string(),
+                    )),
+                    // If retrieving the upstream_branch fails, that means that there is no valid
+                    // upstream branch (surprise surprise)
+                    //
+                    // When there's no valid remote branch, we should default to the repository's
+                    // default branch, for the vast majority of cases, this will be either "main"
+                    // or "master" but it could be different for whatever INSANE person has changed
+                    // their default to differ from those two terms.
+                    //
+                    // Thankfully, we have a command 'git rev-parse --abbrev-ref <remote>/HEAD'
+                    // to let us retrieve the default branch (we also need to split on the first /
+                    // encountered and take the second split part)
+                    //
+                    // However, it's a bit dodgy so we can't guarantee it will work everytime. If
+                    // the command 'git rev-parse --abbrev-ref <remote>/HEAD' fails, we should just
+                    // default to the local branch and the user will just have to suck it up and
+                    // deal with the 404 error that they will probably get.
+                    GitOutput::Err(_) => Ok(Cow::Borrowed(branch)),
+                }
+            }
+            // Priority is given to the current tag
+            Local::NotBranch => match git.get_current_tag()? {
+                GitOutput::Ok(tag) => Ok(Cow::Owned(tag)),
+                // Priority is then given the current commit
+                GitOutput::Err(_) => match git.get_current_commit()? {
+                    GitOutput::Ok(commit_hash) => Ok(Cow::Owned(commit_hash)),
+                    // Error out if even the current commit could not be found
+                    GitOutput::Err(err) => Err(AppError::new(ErrorType::CommandFailed, err)),
+                },
+            },
         }
     }
 
-    fn get_git_url(&self, remote: &str, command: &impl GitCommand) -> Result<String, AppError> {
-        match command.execute()? {
+    fn get_git_url(&self, remote: &str, git: &impl GitTrait) -> Result<String, AppError> {
+        match git.is_valid_remote(remote)? {
             GitOutput::Ok(output) => {
                 if output != remote {
                     Ok(output)
@@ -200,6 +223,12 @@ impl<'a> GitView<'a> {
     }
 
     fn generate_final_url(&self, remote_ref: &str, url: &Url) -> String {
+        // if self.commit.unwrap() == "latest" {
+        //     ()
+        // } else {
+        //     ()
+        // }
+
         let branch_ref = match &url.domain {
             Domain::GitHub => {
                 if self.is_issue {
@@ -212,12 +241,6 @@ impl<'a> GitView<'a> {
         };
 
         let mut open_url = format!("{}://{}/{}", url.protocol, url.domain, url.path);
-
-        // if self.commit.unwrap() == "latest" {
-        //     ()
-        // } else {
-        //     ()
-        // }
 
         if remote_ref == "master" || remote_ref == "main" {
             open_url
@@ -264,7 +287,7 @@ mod lib_tests {
     mod is_valid_repository {
         use crate::{
             error::ErrorType,
-            git::{GitOutput, MockGitCommand},
+            git::{GitOutput, MockGitTrait},
             lib_tests::instantiate_handler,
         };
 
@@ -272,8 +295,8 @@ mod lib_tests {
         fn yes() {
             let handler = instantiate_handler();
 
-            let mut mock = MockGitCommand::new();
-            mock.expect_execute()
+            let mut mock = MockGitTrait::default();
+            mock.expect_is_valid_repository()
                 .returning(|| Ok(GitOutput::Ok("Valid".to_owned())));
 
             let is_valid_repository = handler.is_valid_repository(&mock);
@@ -284,8 +307,8 @@ mod lib_tests {
         #[test]
         fn no() {
             let handler = instantiate_handler();
-            let mut mock = MockGitCommand::new();
-            mock.expect_execute()
+            let mut mock = MockGitTrait::default();
+            mock.expect_is_valid_repository()
                 .returning(|| Ok(GitOutput::Err("Error".to_owned())));
 
             let is_valid_repository = handler.is_valid_repository(&mock);
@@ -299,6 +322,18 @@ mod lib_tests {
                 "Looks like you're not in a valid git repository!"
             );
         }
+    }
+
+    mod get_local_ref {
+
+        #[test]
+        fn user_given_branch() {}
+
+        #[test]
+        fn is_branch() {}
+
+        #[test]
+        fn is_not_branch() {}
     }
 
     mod parse_git_url {

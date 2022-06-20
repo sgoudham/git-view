@@ -421,6 +421,94 @@ mod lib_tests {
         }
     }
 
+    mod populate_remote {
+        use std::borrow::Cow;
+
+        use mockall::predicate::eq;
+
+        use crate::{
+            git::{GitOutput, MockGitTrait},
+            GitView, Local,
+        };
+
+        fn handler_with_remote<'a>() -> GitView<'a> {
+            GitView::new(None, Some("origin"), None, false, false)
+        }
+
+        fn handler_without_remote<'a>() -> GitView<'a> {
+            GitView::new(None, None, None, false, false)
+        }
+
+        #[test]
+        fn is_not_branch() {
+            let handler = handler_without_remote();
+            let mock = MockGitTrait::default();
+
+            let actual_remote = handler.populate_remote(&Local::NotBranch, &mock);
+
+            assert!(actual_remote.is_ok());
+            assert_eq!(actual_remote.unwrap(), "origin");
+        }
+
+        #[test]
+        fn user_given_remote() {
+            let handler = handler_with_remote();
+            let mock = MockGitTrait::default();
+
+            let actual_remote = handler.populate_remote(&Local::Branch(Cow::Borrowed("")), &mock);
+
+            assert!(actual_remote.is_ok());
+            assert_eq!(actual_remote.unwrap(), handler.remote.unwrap());
+        }
+
+        #[test]
+        fn is_default_remote() {
+            let handler = handler_without_remote();
+            let mut mock = MockGitTrait::default();
+            mock.expect_get_default_remote()
+                .returning(|| Ok(GitOutput::Ok("default_remote".into())));
+
+            let actual_remote = handler.populate_remote(&Local::Branch(Cow::Borrowed("")), &mock);
+
+            assert!(actual_remote.is_ok());
+            assert_eq!(actual_remote.unwrap(), "default_remote");
+        }
+
+        #[test]
+        fn is_tracked_remote() {
+            let handler = handler_without_remote();
+            let mut mock = MockGitTrait::default();
+            mock.expect_get_default_remote()
+                .returning(|| Ok(GitOutput::Err("error".into())));
+            mock.expect_get_tracked_remote()
+                .with(eq("branch"))
+                .returning(|_| Ok(GitOutput::Ok("tracked_remote".into())));
+
+            let actual_remote =
+                handler.populate_remote(&Local::Branch(Cow::Borrowed("branch")), &mock);
+
+            assert!(actual_remote.is_ok());
+            assert_eq!(actual_remote.unwrap(), "tracked_remote");
+        }
+
+        #[test]
+        fn is_not_default_or_tracked() {
+            let handler = handler_without_remote();
+            let mut mock = MockGitTrait::default();
+            mock.expect_get_default_remote()
+                .returning(|| Ok(GitOutput::Err("error".into())));
+            mock.expect_get_tracked_remote()
+                .with(eq("branch"))
+                .returning(|_| Ok(GitOutput::Err("error".into())));
+
+            let actual_remote =
+                handler.populate_remote(&Local::Branch(Cow::Borrowed("branch")), &mock);
+
+            assert!(actual_remote.is_ok());
+            assert_eq!(actual_remote.unwrap(), "origin");
+        }
+    }
+
     mod parse_git_url {
         use crate::{error::AppError, lib_tests::instantiate_handler};
         use test_case::test_case;

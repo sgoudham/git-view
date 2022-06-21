@@ -48,7 +48,7 @@ impl<'a> GitView<'a> {
         // Retrieve the remote
         let remote = self.populate_remote(&local_ref, &git)?;
         // Retrieve the remote reference
-        let remote_ref = self.get_remote_reference(&local_ref, &git)?;
+        let remote_ref = self.get_remote_reference(&local_ref, &remote, &git)?;
 
         // Retrieve the full git_url
         // e.g https://github.com/sgoudham/git-view.git
@@ -121,6 +121,7 @@ impl<'a> GitView<'a> {
     fn get_remote_reference(
         &self,
         local: &'a Local,
+        remote: &'a str,
         git: &impl GitTrait,
     ) -> Result<Cow<'a, str>, AppError> {
         match local {
@@ -129,23 +130,16 @@ impl<'a> GitView<'a> {
                     GitOutput::Ok(output) => Ok(Cow::Owned(
                         output.trim_start_matches("refs/heads/").to_string(),
                     )),
-                    // If retrieving the upstream_branch fails, that means that there is no valid
-                    // upstream branch (surprise surprise)
-                    //
-                    // When there's no valid remote branch, we should default to the repository's
-                    // default branch, for the vast majority of cases, this will be either "main"
-                    // or "master" but it could be different for whatever INSANE person has changed
-                    // their default to differ from those two terms.
-                    //
-                    // Thankfully, we have a command 'git rev-parse --abbrev-ref <remote>/HEAD'
-                    // to let us retrieve the default branch (we also need to split on the first /
-                    // encountered and take the second split part)
-                    //
-                    // However, it's a bit dodgy so we can't guarantee it will work everytime. If
-                    // the command 'git rev-parse --abbrev-ref <remote>/HEAD' fails, we should just
-                    // default to the local branch and the user will just have to suck it up and
-                    // deal with the 404 error that they will probably get.
-                    GitOutput::Err(_) => Ok(Cow::Borrowed(branch)),
+                    // Upstream branch doesn't exist, try to retrieve default remote branch
+                    GitOutput::Err(_) => match git.get_default_branch(remote)? {
+                        GitOutput::Ok(default_branch) => match default_branch.split_once('/') {
+                            Some((_, split_branch)) => Ok(Cow::Owned(split_branch.into())),
+                            None => Ok(Cow::Borrowed(branch)),
+                        },
+                        // Default branch couldn't be retrieved, just use the local branch
+                        // (this WILL result in a 404 error on the user but better than failing?)
+                        GitOutput::Err(_) => Ok(Cow::Borrowed(branch)),
+                    },
                 }
             }
             // Priority is given to the current tag
@@ -506,6 +500,121 @@ mod lib_tests {
 
             assert!(actual_remote.is_ok());
             assert_eq!(actual_remote.unwrap(), "origin");
+        }
+    }
+
+    mod get_remote_reference {
+        use std::borrow::Cow;
+
+        use crate::{
+            error::ErrorType,
+            git::{GitOutput, MockGitTrait},
+            GitView, Local,
+        };
+
+        fn handler<'a>() -> GitView<'a> {
+            GitView::new(None, None, None, false, false)
+        }
+
+        #[test]
+        fn is_branch_and_exists_on_remote() {
+            let handler = handler();
+            let local = Local::Branch(Cow::Borrowed("main"));
+            let mut mock = MockGitTrait::default();
+
+            mock.expect_get_upstream_branch()
+                .returning(|_| Ok(GitOutput::Ok("refs/heads/main".into())));
+
+            let actual_upstream_branch = handler.get_remote_reference(&local, "origin", &mock);
+
+            assert!(actual_upstream_branch.is_ok());
+            assert_eq!(actual_upstream_branch.unwrap(), "main");
+        }
+
+        #[test]
+        fn is_branch_and_successfully_get_default() {
+            let handler = handler();
+            let local = Local::Branch(Cow::Borrowed("main"));
+            let mut mock = MockGitTrait::default();
+
+            mock.expect_get_upstream_branch()
+                .returning(|_| Ok(GitOutput::Err("error".into())));
+            mock.expect_get_default_branch()
+                .returning(|_| Ok(GitOutput::Ok("origin/main".into())));
+
+            let actual_upstream_branch = handler.get_remote_reference(&local, "origin", &mock);
+
+            assert!(actual_upstream_branch.is_ok());
+            assert_eq!(actual_upstream_branch.unwrap(), "main")
+        }
+
+        #[test]
+        fn is_branch_and_fail_to_get_default() {
+            let handler = handler();
+            let local = Local::Branch(Cow::Borrowed("main"));
+            let mut mock = MockGitTrait::default();
+
+            mock.expect_get_upstream_branch()
+                .returning(|_| Ok(GitOutput::Err("error".into())));
+            mock.expect_get_default_branch()
+                .returning(|_| Ok(GitOutput::Err("error".into())));
+
+            let actual_upstream_branch = handler.get_remote_reference(&local, "origin", &mock);
+
+            assert!(actual_upstream_branch.is_ok());
+            assert_eq!(actual_upstream_branch.unwrap(), "main")
+        }
+
+        #[test]
+        fn not_branch_and_get_current_tag() {
+            let handler = handler();
+            let local = Local::NotBranch;
+            let mut mock = MockGitTrait::default();
+
+            mock.expect_get_current_tag()
+                .returning(|| Ok(GitOutput::Ok("v1.0.0".into())));
+
+            let actual_upstream_branch = handler.get_remote_reference(&local, "origin", &mock);
+
+            assert!(actual_upstream_branch.is_ok());
+            assert_eq!(actual_upstream_branch.unwrap(), "v1.0.0")
+        }
+
+        #[test]
+        fn not_branch_and_get_current_commit() {
+            let handler = handler();
+            let local = Local::NotBranch;
+            let mut mock = MockGitTrait::default();
+
+            mock.expect_get_current_tag()
+                .returning(|| Ok(GitOutput::Err("error".into())));
+            mock.expect_get_current_commit()
+                .returning(|| Ok(GitOutput::Ok("hash".into())));
+
+            let actual_upstream_branch = handler.get_remote_reference(&local, "origin", &mock);
+
+            assert!(actual_upstream_branch.is_ok());
+            assert_eq!(actual_upstream_branch.unwrap(), "hash")
+        }
+
+        #[test]
+        fn not_branch_and_no_tag_or_commit() {
+            let handler = handler();
+            let local = Local::NotBranch;
+            let mut mock = MockGitTrait::default();
+
+            mock.expect_get_current_tag()
+                .returning(|| Ok(GitOutput::Err("error".into())));
+            mock.expect_get_current_commit()
+                .returning(|| Ok(GitOutput::Err("error".into())));
+
+            let actual_upstream_branch = handler.get_remote_reference(&local, "origin", &mock);
+
+            assert!(actual_upstream_branch.is_err());
+
+            let error = actual_upstream_branch.as_ref().unwrap_err();
+            assert_eq!(error.error_type, ErrorType::CommandFailed);
+            assert_eq!(error.error_str, "error");
         }
     }
 

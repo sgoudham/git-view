@@ -434,7 +434,7 @@ mod lib_tests {
         }
 
         #[test]
-        fn is_not_branch() {
+        fn is_not_branch1() {
             let handler = handler_without_remote();
             let mock = MockGitTrait::default();
 
@@ -615,6 +615,71 @@ mod lib_tests {
             let error = actual_upstream_branch.as_ref().unwrap_err();
             assert_eq!(error.error_type, ErrorType::CommandFailed);
             assert_eq!(error.error_str, "error");
+        }
+    }
+
+    mod get_git_url {
+        use crate::{
+            git::{GitOutput, MockGitTrait},
+            GitView, error::{AppError, ErrorType},
+        };
+
+        fn handler<'a>() -> GitView<'a> {
+            GitView::new(None, None, None, false, false)
+        }
+
+        #[test]
+        fn is_valid_remote() {
+            let handler = handler();
+            let expected_remote = "origin";
+            let mut mock = MockGitTrait::default();
+
+            mock.expect_is_valid_remote()
+                .returning(|_| Ok(GitOutput::Ok("https://github.com/sgoudham/git-view".into())));
+
+            let actual_remote = handler.get_git_url(expected_remote, &mock);
+
+            assert!(actual_remote.is_ok());
+            assert_eq!(
+                actual_remote.unwrap(),
+                "https://github.com/sgoudham/git-view"
+            )
+        }
+
+        #[test]
+        fn is_not_valid_remote() {
+            let handler = handler();
+            let expected_remote = "origin";
+            let mut mock = MockGitTrait::default();
+
+            mock.expect_is_valid_remote()
+                .returning(|_| Ok(GitOutput::Ok("origin".into())));
+
+            let actual_remote = handler.get_git_url(expected_remote, &mock);
+
+            assert!(actual_remote.is_err());
+            assert_eq!(
+                actual_remote.unwrap_err().error_str,
+                "Looks like your git remote isn't set for 'origin'"
+            );
+        }
+
+        #[test]
+        fn command_failed() {
+            let handler = handler();
+            let expected_remote = "origin";
+            let mut mock = MockGitTrait::default();
+
+            mock.expect_is_valid_remote()
+                .returning(|_| Err(AppError::new(ErrorType::CommandFailed, "error".into())));
+
+            let actual_remote = handler.get_git_url(expected_remote, &mock);
+
+            assert!(actual_remote.is_err());
+            assert_eq!(
+                actual_remote.unwrap_err().error_str,
+                "error"
+            );
         }
     }
 

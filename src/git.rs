@@ -156,9 +156,9 @@ fn trim(bytes: &[u8]) -> Result<String, AppError> {
 impl Url {
     pub(crate) fn new(protocol: &str, domain: Domain, path: &str) -> Self {
         Self {
-            protocol: protocol.to_owned(),
+            protocol: protocol.into(),
             domain,
-            path: path.to_owned(),
+            path: path.into(),
         }
     }
 }

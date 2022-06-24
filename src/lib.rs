@@ -250,7 +250,9 @@ impl<'a> GitView<'a> {
                     format!("/tree/{}", escape_ascii_chars(remote_ref))
                 }
             }
-            Domain::BitBucket => todo!(),
+            Domain::BitBucket => {
+                format!("/src/{}", remote_ref)
+            }
         };
 
         if remote_ref == "master" || remote_ref == "main" {
@@ -434,7 +436,7 @@ mod lib_tests {
         }
 
         #[test]
-        fn is_not_branch1() {
+        fn is_not_branch() {
             let handler = handler_without_remote();
             let mock = MockGitTrait::default();
 
@@ -620,8 +622,9 @@ mod lib_tests {
 
     mod get_git_url {
         use crate::{
+            error::{AppError, ErrorType},
             git::{GitOutput, MockGitTrait},
-            GitView, error::{AppError, ErrorType},
+            GitView,
         };
 
         fn handler<'a>() -> GitView<'a> {
@@ -676,10 +679,7 @@ mod lib_tests {
             let actual_remote = handler.get_git_url(expected_remote, &mock);
 
             assert!(actual_remote.is_err());
-            assert_eq!(
-                actual_remote.unwrap_err().error_str,
-                "error"
-            );
+            assert_eq!(actual_remote.unwrap_err().error_str, "error");
         }
     }
 
@@ -729,6 +729,130 @@ mod lib_tests {
                 error.unwrap_err().error_str,
                 "Sorry, couldn't parse git url 'This isn't a git url'"
             );
+        }
+    }
+
+    mod generate_final_url {
+        use crate::{
+            git::{Domain, GitOutput, MockGitTrait, Url},
+            GitView,
+        };
+        use test_case::test_case;
+
+        fn handler_with_commit(commit: Option<&'_ str>) -> GitView<'_> {
+            GitView {
+                remote: None,
+                branch: None,
+                commit,
+                is_issue: false,
+                is_print: false,
+            }
+        }
+
+        fn handler_with_issue<'a>(is_issue: bool) -> GitView<'a> {
+            GitView {
+                remote: None,
+                branch: None,
+                commit: None,
+                is_issue,
+                is_print: false,
+            }
+        }
+
+        #[test]
+        fn is_latest_commit() {
+            let expected_final_url = "https://github.com/sgoudham/git-view/tree/commit_hash";
+            let handler = handler_with_commit(Some("latest"));
+            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let mut mock = MockGitTrait::default();
+
+            mock.expect_get_current_commit()
+                .returning(|| Ok(GitOutput::Ok("commit_hash".into())));
+
+            let actual_final_url = handler.generate_final_url("main", &url, &mock);
+
+            assert!(actual_final_url.is_ok());
+            assert_eq!(actual_final_url.unwrap(), expected_final_url);
+        }
+
+        #[test]
+        fn is_user_commit() {
+            let expected_final_url =
+                "https://github.com/sgoudham/git-view/tree/8s2jl250as7f234jasfjj";
+            let handler = handler_with_commit(Some("8s2jl250as7f234jasfjj"));
+            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let mock = MockGitTrait::default();
+
+            let actual_final_url = handler.generate_final_url("main", &url, &mock);
+
+            assert!(actual_final_url.is_ok());
+            assert_eq!(actual_final_url.unwrap(), expected_final_url);
+        }
+
+        #[test]
+        fn is_bitbucket() {
+            let expected_final_url = "https://bitbucket.org/sgoudham/git-view/src/dev";
+            let handler = handler_with_commit(None);
+            let url = Url::new("https", Domain::BitBucket, "sgoudham/git-view");
+            let mock = MockGitTrait::default();
+
+            let actual_final_url = handler.generate_final_url("dev", &url, &mock);
+
+            assert!(actual_final_url.is_ok());
+            assert_eq!(actual_final_url.unwrap(), expected_final_url);
+        }
+
+        #[test]
+        fn is_github() {
+            let expected_final_url = "https://github.com/sgoudham/git-view/tree/dev";
+            let handler = handler_with_commit(None);
+            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let mock = MockGitTrait::default();
+
+            let actual_final_url = handler.generate_final_url("dev", &url, &mock);
+
+            assert!(actual_final_url.is_ok());
+            assert_eq!(actual_final_url.unwrap(), expected_final_url);
+        }
+
+        #[test_case("main" ; "main")]
+        #[test_case("master" ; "master")]
+        fn is_master_or_main(branch: &str) {
+            let expected_final_url = "https://github.com/sgoudham/git-view";
+            let handler = handler_with_commit(None);
+            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let mock = MockGitTrait::default();
+
+            let actual_final_url = handler.generate_final_url(branch, &url, &mock);
+
+            assert!(actual_final_url.is_ok());
+            assert_eq!(actual_final_url.unwrap(), expected_final_url);
+        }
+
+        #[test]
+        fn is_user_issue() {
+            let expected_final_url = "https://github.com/sgoudham/git-view/issues/1234";
+            let handler = handler_with_issue(true);
+            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let mock = MockGitTrait::default();
+
+            let actual_final_url = handler.generate_final_url("TICKET-1234", &url, &mock);
+
+            assert!(actual_final_url.is_ok());
+            assert_eq!(actual_final_url.unwrap(), expected_final_url);
+        }
+
+        #[test]
+        fn is_normal_branch() {
+            let expected_final_url = "https://github.com/sgoudham/git-view/tree/%23test%23";
+            let handler = handler_with_issue(false);
+            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let mock = MockGitTrait::default();
+
+            let actual_final_url = handler.generate_final_url("#test#", &url, &mock);
+
+            assert!(actual_final_url.is_ok());
+            assert_eq!(actual_final_url.unwrap(), expected_final_url);
         }
     }
 

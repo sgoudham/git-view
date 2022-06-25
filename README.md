@@ -33,7 +33,8 @@ that you want!
 
 ## Installation
 
-
+The _preferred_ way of installation is to manually install the provided binaries into your local `git` directory to enable
+the usage as `git view`. However, that being said, it also available on [crates.io]() to allow installation through the use of `cargo`.
 
 ### Windows
 
@@ -42,21 +43,10 @@ that you want!
 ## Usage
 
 ```commandline
-$ git view -h
-
-...
-
-USAGE:
-    git-view.exe [OPTIONS]
-
-OPTIONS:
-    -r, --remote <name>    The remote to view git repository on
-    -b, --branch <name>    The branch to view git repository on
-    -c, --commit <hash>    The commit to view git repository on
-    -p, --print            Print the URL (doesn't open browser)
-    -h, --help             Print help information
-    -V, --version          Print version information
+$ git view --help
 ```
+
+![help](./docs/images/v0-1-0.png "Contents displayed when running `git view --help`")
 
 ## License
 

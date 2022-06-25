@@ -5,7 +5,7 @@
 [![downloads](https://img.shields.io/crates/d/git-view)](https://crates.io/crates/git-view)
 [![license](https://img.shields.io/github/license/sgoudham/git-view)](LICENSE)
 
-> A git sub-command to open your git repository in the web browser!
+> A git sub-command to view your git repository in the web browser!
 
 ## Table Of Contents
 
@@ -13,21 +13,31 @@ TODO
 
 ## About
 
-Are you frustrated from moving your hands away from the keyboard to open your git repository in the browser? 
+Are you _also_ frustrated from moving your hands away from the keyboard to view your git repository in the browser? 
 
 > Me too!
 
-`git-view` allows you to do _just that._
+`git-view` alleviates that pain by allowing you to chuck away your mouse!
 
-_Note: The use of a mouse or trackpad may be required to navigate the browser :P_
+> (n)vim users rejoice :P
 
 ## Features
 
-TODO
+- [x] GitHub & BitBucket
+- [x] View Branches, Commits & Issues
+- [x] Custom Suffix
+- [x] Custom Remote
+
+Feel free to raise any issues or pull requests (after having read the [CONTRIBUTING.md]()!!) for any additional Features
+that you want!
 
 ## Installation
 
-TODO
+
+
+### Windows
+
+### *nix / macOS
 
 ## Usage
 

@@ -4,30 +4,30 @@ mod git;
 use std::borrow::Cow;
 
 use error::{AppError, ErrorType};
-use git::{Domain, GitOutput, GitTrait, Url};
+use git::{Domain, GitOutput, GitTrait, GitViewBuilder, Local, Url};
 
 pub use git::Git;
 
-#[derive(Debug, PartialEq)]
-enum Local<'a> {
-    Branch(Cow<'a, str>),
-    NotBranch,
-}
-
-#[derive(Debug)]
+#[derive(Default)]
 pub struct GitView<'a> {
     remote: Option<&'a str>,
     branch: Option<&'a str>,
     commit: Option<&'a str>,
+    suffix: Option<&'a str>,
     is_issue: bool,
     is_print: bool,
 }
 
 impl<'a> GitView<'a> {
+    fn builder() -> GitViewBuilder<'a> {
+        GitViewBuilder::default()
+    }
+
     pub fn new(
         branch: Option<&'a str>,
         remote: Option<&'a str>,
         commit: Option<&'a str>,
+        suffix: Option<&'a str>,
         is_issue: bool,
         is_print: bool,
     ) -> Self {
@@ -35,6 +35,7 @@ impl<'a> GitView<'a> {
             remote,
             branch,
             commit,
+            suffix,
             is_issue,
             is_print,
         }
@@ -255,12 +256,15 @@ impl<'a> GitView<'a> {
             }
         };
 
-        if remote_ref == "master" || remote_ref == "main" {
-            Ok(open_url)
-        } else {
+        if remote_ref != "master" && remote_ref != "main" {
             open_url.push_str(&branch_ref);
-            Ok(open_url)
         }
+
+        if let Some(suffix) = self.suffix {
+            open_url.push_str(suffix);
+        }
+
+        Ok(open_url)
     }
 }
 
@@ -312,24 +316,19 @@ fn escape_ascii_chars(remote_ref: &str) -> Cow<'_, str> {
 
 #[cfg(test)]
 mod lib_tests {
-    use crate::GitView;
-
-    fn instantiate_handler() -> GitView<'static> {
-        GitView::new(Some("main"), Some("origin"), None, false, false)
-    }
 
     mod is_valid_repository {
         use crate::{
             error::ErrorType,
             git::{GitOutput, MockGitTrait},
-            lib_tests::instantiate_handler,
+            GitView,
         };
 
         #[test]
         fn yes() {
-            let handler = instantiate_handler();
-
+            let handler = GitView::default();
             let mut mock = MockGitTrait::default();
+
             mock.expect_is_valid_repository()
                 .returning(|| Ok(GitOutput::Ok("Valid".to_owned())));
 
@@ -340,15 +339,15 @@ mod lib_tests {
 
         #[test]
         fn no() {
-            let handler = instantiate_handler();
+            let handler = GitView::default();
             let mut mock = MockGitTrait::default();
+
             mock.expect_is_valid_repository()
                 .returning(|| Ok(GitOutput::Err("Error".to_owned())));
 
             let is_valid_repository = handler.is_valid_repository(&mock);
 
             assert!(is_valid_repository.is_err());
-
             let error = is_valid_repository.as_ref().unwrap_err();
             assert_eq!(error.error_type, ErrorType::MissingGitRepository);
             assert_eq!(
@@ -366,17 +365,9 @@ mod lib_tests {
             GitView, Local,
         };
 
-        fn handler_with_branch<'a>() -> GitView<'a> {
-            GitView::new(Some("main"), None, None, false, false)
-        }
-
-        fn handler_without_branch<'a>() -> GitView<'a> {
-            GitView::new(None, None, None, false, false)
-        }
-
         #[test]
         fn user_given_branch() {
-            let handler = handler_with_branch();
+            let handler = GitView::builder().with_branch("main").build();
             let mock = MockGitTrait::default();
             let expected_local_ref = Ok(Local::Branch(Cow::Borrowed("main")));
 
@@ -388,7 +379,7 @@ mod lib_tests {
 
         #[test]
         fn is_branch() {
-            let handler = handler_without_branch();
+            let handler = GitView::default();
             let mut mock = MockGitTrait::default();
             let expected_local_ref = Ok(Local::Branch(Cow::Borrowed("dev")));
 
@@ -403,7 +394,7 @@ mod lib_tests {
 
         #[test]
         fn is_not_branch() {
-            let handler = handler_without_branch();
+            let handler = GitView::default();
             let mut mock = MockGitTrait::default();
             let expected_local_ref = Ok(Local::NotBranch);
 
@@ -427,17 +418,9 @@ mod lib_tests {
             GitView, Local,
         };
 
-        fn handler_with_remote<'a>() -> GitView<'a> {
-            GitView::new(None, Some("origin"), None, false, false)
-        }
-
-        fn handler_without_remote<'a>() -> GitView<'a> {
-            GitView::new(None, None, None, false, false)
-        }
-
         #[test]
         fn is_not_branch() {
-            let handler = handler_without_remote();
+            let handler = GitView::builder().with_remote("origin").build();
             let mock = MockGitTrait::default();
 
             let actual_remote = handler.populate_remote(&Local::NotBranch, &mock);
@@ -448,7 +431,7 @@ mod lib_tests {
 
         #[test]
         fn user_given_remote() {
-            let handler = handler_with_remote();
+            let handler = GitView::builder().with_remote("origin").build();
             let mock = MockGitTrait::default();
 
             let actual_remote = handler.populate_remote(&Local::Branch(Cow::Borrowed("")), &mock);
@@ -459,8 +442,9 @@ mod lib_tests {
 
         #[test]
         fn is_default_remote() {
-            let handler = handler_without_remote();
+            let handler = GitView::default();
             let mut mock = MockGitTrait::default();
+
             mock.expect_get_default_remote()
                 .returning(|| Ok(GitOutput::Ok("default_remote".into())));
 
@@ -472,8 +456,9 @@ mod lib_tests {
 
         #[test]
         fn is_tracked_remote() {
-            let handler = handler_without_remote();
+            let handler = GitView::default();
             let mut mock = MockGitTrait::default();
+
             mock.expect_get_default_remote()
                 .returning(|| Ok(GitOutput::Err("error".into())));
             mock.expect_get_tracked_remote()
@@ -489,8 +474,9 @@ mod lib_tests {
 
         #[test]
         fn is_not_default_or_tracked() {
-            let handler = handler_without_remote();
+            let handler = GitView::default();
             let mut mock = MockGitTrait::default();
+
             mock.expect_get_default_remote()
                 .returning(|| Ok(GitOutput::Err("error".into())));
             mock.expect_get_tracked_remote()
@@ -514,13 +500,9 @@ mod lib_tests {
             GitView, Local,
         };
 
-        fn handler<'a>() -> GitView<'a> {
-            GitView::new(None, None, None, false, false)
-        }
-
         #[test]
         fn is_branch_and_exists_on_remote() {
-            let handler = handler();
+            let handler = GitView::default();
             let local = Local::Branch(Cow::Borrowed("main"));
             let mut mock = MockGitTrait::default();
 
@@ -535,7 +517,7 @@ mod lib_tests {
 
         #[test]
         fn is_branch_and_successfully_get_default() {
-            let handler = handler();
+            let handler = GitView::default();
             let local = Local::Branch(Cow::Borrowed("main"));
             let mut mock = MockGitTrait::default();
 
@@ -552,7 +534,7 @@ mod lib_tests {
 
         #[test]
         fn is_branch_and_fail_to_get_default() {
-            let handler = handler();
+            let handler = GitView::default();
             let local = Local::Branch(Cow::Borrowed("main"));
             let mut mock = MockGitTrait::default();
 
@@ -569,7 +551,7 @@ mod lib_tests {
 
         #[test]
         fn not_branch_and_get_current_tag() {
-            let handler = handler();
+            let handler = GitView::default();
             let local = Local::NotBranch;
             let mut mock = MockGitTrait::default();
 
@@ -584,7 +566,7 @@ mod lib_tests {
 
         #[test]
         fn not_branch_and_get_current_commit() {
-            let handler = handler();
+            let handler = GitView::default();
             let local = Local::NotBranch;
             let mut mock = MockGitTrait::default();
 
@@ -601,7 +583,7 @@ mod lib_tests {
 
         #[test]
         fn not_branch_and_no_tag_or_commit() {
-            let handler = handler();
+            let handler = GitView::default();
             let local = Local::NotBranch;
             let mut mock = MockGitTrait::default();
 
@@ -627,13 +609,9 @@ mod lib_tests {
             GitView,
         };
 
-        fn handler<'a>() -> GitView<'a> {
-            GitView::new(None, None, None, false, false)
-        }
-
         #[test]
         fn is_valid_remote() {
-            let handler = handler();
+            let handler = GitView::default();
             let expected_remote = "origin";
             let mut mock = MockGitTrait::default();
 
@@ -651,7 +629,7 @@ mod lib_tests {
 
         #[test]
         fn is_not_valid_remote() {
-            let handler = handler();
+            let handler = GitView::default();
             let expected_remote = "origin";
             let mut mock = MockGitTrait::default();
 
@@ -669,7 +647,7 @@ mod lib_tests {
 
         #[test]
         fn command_failed() {
-            let handler = handler();
+            let handler = GitView::default();
             let expected_remote = "origin";
             let mut mock = MockGitTrait::default();
 
@@ -684,14 +662,14 @@ mod lib_tests {
     }
 
     mod parse_git_url {
-        use crate::{error::AppError, lib_tests::instantiate_handler};
+        use crate::{error::AppError, GitView};
         use test_case::test_case;
 
         #[test_case("https://github.com:8080/sgoudham/git-view.git" ; "with port")]
         #[test_case("https://github.com/sgoudham/git-view.git"      ; "normal")]
         #[test_case("https://github.com/sgoudham/git-view.git/"     ; "with trailing slash")]
         fn https(git_url: &str) -> Result<(), AppError> {
-            let handler = instantiate_handler();
+            let handler = GitView::default();
 
             let url = handler.parse_git_url(git_url)?;
 
@@ -706,7 +684,7 @@ mod lib_tests {
         #[test_case("github.com:sgoudham/git-view.git"      ; "normal")]
         #[test_case("github.com:sgoudham/git-view.git/"     ; "with trailing slash")]
         fn scp_like(git_url: &str) -> Result<(), AppError> {
-            let handler = instantiate_handler();
+            let handler = GitView::default();
 
             let url = handler.parse_git_url(git_url)?;
 
@@ -719,7 +697,7 @@ mod lib_tests {
 
         #[test]
         fn invalid_git_url() {
-            let handler = instantiate_handler();
+            let handler = GitView::default();
             let git_url_normal = "This isn't a git url";
 
             let error = handler.parse_git_url(git_url_normal);
@@ -739,31 +717,11 @@ mod lib_tests {
         };
         use test_case::test_case;
 
-        fn handler_with_commit(commit: Option<&'_ str>) -> GitView<'_> {
-            GitView {
-                remote: None,
-                branch: None,
-                commit,
-                is_issue: false,
-                is_print: false,
-            }
-        }
-
-        fn handler_with_issue<'a>(is_issue: bool) -> GitView<'a> {
-            GitView {
-                remote: None,
-                branch: None,
-                commit: None,
-                is_issue,
-                is_print: false,
-            }
-        }
-
         #[test]
         fn is_latest_commit() {
-            let expected_final_url = "https://github.com/sgoudham/git-view/tree/commit_hash";
-            let handler = handler_with_commit(Some("latest"));
+            let handler = GitView::builder().with_commit("latest").build();
             let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let expected_final_url = "https://github.com/sgoudham/git-view/tree/commit_hash";
             let mut mock = MockGitTrait::default();
 
             mock.expect_get_current_commit()
@@ -777,10 +735,12 @@ mod lib_tests {
 
         #[test]
         fn is_user_commit() {
+            let handler = GitView::builder()
+                .with_commit("8s2jl250as7f234jasfjj")
+                .build();
+            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
             let expected_final_url =
                 "https://github.com/sgoudham/git-view/tree/8s2jl250as7f234jasfjj";
-            let handler = handler_with_commit(Some("8s2jl250as7f234jasfjj"));
-            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
             let mock = MockGitTrait::default();
 
             let actual_final_url = handler.generate_final_url("main", &url, &mock);
@@ -791,9 +751,9 @@ mod lib_tests {
 
         #[test]
         fn is_bitbucket() {
-            let expected_final_url = "https://bitbucket.org/sgoudham/git-view/src/dev";
-            let handler = handler_with_commit(None);
+            let handler = GitView::default();
             let url = Url::new("https", Domain::BitBucket, "sgoudham/git-view");
+            let expected_final_url = "https://bitbucket.org/sgoudham/git-view/src/dev";
             let mock = MockGitTrait::default();
 
             let actual_final_url = handler.generate_final_url("dev", &url, &mock);
@@ -804,9 +764,9 @@ mod lib_tests {
 
         #[test]
         fn is_github() {
-            let expected_final_url = "https://github.com/sgoudham/git-view/tree/dev";
-            let handler = handler_with_commit(None);
+            let handler = GitView::default();
             let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let expected_final_url = "https://github.com/sgoudham/git-view/tree/dev";
             let mock = MockGitTrait::default();
 
             let actual_final_url = handler.generate_final_url("dev", &url, &mock);
@@ -818,9 +778,9 @@ mod lib_tests {
         #[test_case("main" ; "main")]
         #[test_case("master" ; "master")]
         fn is_master_or_main(branch: &str) {
-            let expected_final_url = "https://github.com/sgoudham/git-view";
-            let handler = handler_with_commit(None);
+            let handler = GitView::default();
             let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let expected_final_url = "https://github.com/sgoudham/git-view";
             let mock = MockGitTrait::default();
 
             let actual_final_url = handler.generate_final_url(branch, &url, &mock);
@@ -831,9 +791,9 @@ mod lib_tests {
 
         #[test]
         fn is_user_issue() {
-            let expected_final_url = "https://github.com/sgoudham/git-view/issues/1234";
-            let handler = handler_with_issue(true);
+            let handler = GitView::builder().is_issue(true).build();
             let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let expected_final_url = "https://github.com/sgoudham/git-view/issues/1234";
             let mock = MockGitTrait::default();
 
             let actual_final_url = handler.generate_final_url("TICKET-1234", &url, &mock);
@@ -844,12 +804,25 @@ mod lib_tests {
 
         #[test]
         fn is_normal_branch() {
-            let expected_final_url = "https://github.com/sgoudham/git-view/tree/%23test%23";
-            let handler = handler_with_issue(false);
+            let handler = GitView::builder().is_issue(false).build();
             let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let expected_final_url = "https://github.com/sgoudham/git-view/tree/%23test%23";
             let mock = MockGitTrait::default();
 
             let actual_final_url = handler.generate_final_url("#test#", &url, &mock);
+
+            assert!(actual_final_url.is_ok());
+            assert_eq!(actual_final_url.unwrap(), expected_final_url);
+        }
+
+        #[test_case("main", "https://github.com/sgoudham/git-view/releases" ; "with_branch_main")]
+        #[test_case("dev", "https://github.com/sgoudham/git-view/tree/dev/releases" ; "with_branch_dev")]
+        fn with_suffix(remote_ref: &str, expected_final_url: &str) {
+            let handler = GitView::builder().with_suffix("/releases").build();
+            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let mock = MockGitTrait::default();
+
+            let actual_final_url = handler.generate_final_url(remote_ref, &url, &mock);
 
             assert!(actual_final_url.is_ok());
             assert_eq!(actual_final_url.unwrap(), expected_final_url);

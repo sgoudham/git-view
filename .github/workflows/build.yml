@@ -2,9 +2,17 @@ name: build
 
 on:
   push:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/**'
     branches:
       - '**'
   pull_request:
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/**'
 
 jobs:
   install-cross:

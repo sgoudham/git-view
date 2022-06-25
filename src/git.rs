@@ -4,7 +4,7 @@ use std::{
     process::{Command, Output},
 };
 
-use crate::{error::AppError, GitView};
+use crate::error::AppError;
 #[cfg(test)]
 use mockall::automock;
 
@@ -45,59 +45,6 @@ pub(crate) enum GitCommand<'a> {
 pub enum GitOutput {
     Ok(String),
     Err(String),
-}
-
-#[derive(Default)]
-pub(crate) struct GitViewBuilder<'a> {
-    remote: Option<&'a str>,
-    branch: Option<&'a str>,
-    commit: Option<&'a str>,
-    suffix: Option<&'a str>,
-    is_issue: bool,
-    is_print: bool,
-}
-
-impl<'a> GitViewBuilder<'a> {
-    pub(crate) fn with_remote(mut self, remote: &'a str) -> Self {
-        self.remote = Some(remote);
-        self
-    }
-
-    pub(crate) fn with_branch(mut self, branch: &'a str) -> Self {
-        self.branch = Some(branch);
-        self
-    }
-
-    pub(crate) fn with_commit(mut self, commit: &'a str) -> Self {
-        self.commit = Some(commit);
-        self
-    }
-
-    pub(crate) fn with_suffix(mut self, suffix: &'a str) -> Self {
-        self.suffix = Some(suffix);
-        self
-    }
-
-    pub(crate) fn is_issue(mut self, is_issue: bool) -> Self {
-        self.is_issue = is_issue;
-        self
-    }
-
-    pub(crate) fn is_print(mut self, is_print: bool) -> Self {
-        self.is_print = is_print;
-        self
-    }
-
-    pub(crate) fn build(self) -> GitView<'a> {
-        GitView::new(
-            self.branch,
-            self.remote,
-            self.commit,
-            self.suffix,
-            self.is_issue,
-            self.is_print,
-        )
-    }
 }
 
 #[cfg_attr(test, automock)]

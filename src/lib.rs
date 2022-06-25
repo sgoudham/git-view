@@ -4,7 +4,7 @@ mod git;
 use std::borrow::Cow;
 
 use error::{AppError, ErrorType};
-use git::{Domain, GitOutput, GitTrait, GitViewBuilder, Local, Url};
+use git::{Domain, GitOutput, GitTrait, Local, Url};
 
 pub use git::Git;
 
@@ -19,10 +19,6 @@ pub struct GitView<'a> {
 }
 
 impl<'a> GitView<'a> {
-    fn builder() -> GitViewBuilder<'a> {
-        GitViewBuilder::default()
-    }
-
     pub fn new(
         branch: Option<&'a str>,
         remote: Option<&'a str>,
@@ -316,6 +312,61 @@ fn escape_ascii_chars(remote_ref: &str) -> Cow<'_, str> {
 
 #[cfg(test)]
 mod lib_tests {
+    use crate::GitView;
+
+    impl<'a> GitView<'a> {
+        fn builder() -> GitViewBuilder<'a> {
+            GitViewBuilder::default()
+        }
+    }
+
+    #[derive(Default)]
+    pub(crate) struct GitViewBuilder<'a> {
+        remote: Option<&'a str>,
+        branch: Option<&'a str>,
+        commit: Option<&'a str>,
+        suffix: Option<&'a str>,
+        is_issue: bool,
+        is_print: bool,
+    }
+
+    impl<'a> GitViewBuilder<'a> {
+        pub(crate) fn with_remote(mut self, remote: &'a str) -> Self {
+            self.remote = Some(remote);
+            self
+        }
+
+        pub(crate) fn with_branch(mut self, branch: &'a str) -> Self {
+            self.branch = Some(branch);
+            self
+        }
+
+        pub(crate) fn with_commit(mut self, commit: &'a str) -> Self {
+            self.commit = Some(commit);
+            self
+        }
+
+        pub(crate) fn with_suffix(mut self, suffix: &'a str) -> Self {
+            self.suffix = Some(suffix);
+            self
+        }
+
+        pub(crate) fn with_issue(mut self, is_issue: bool) -> Self {
+            self.is_issue = is_issue;
+            self
+        }
+
+        pub(crate) fn build(self) -> GitView<'a> {
+            GitView::new(
+                self.branch,
+                self.remote,
+                self.commit,
+                self.suffix,
+                self.is_issue,
+                self.is_print,
+            )
+        }
+    }
 
     mod is_valid_repository {
         use crate::{
@@ -791,7 +842,7 @@ mod lib_tests {
 
         #[test]
         fn is_user_issue() {
-            let handler = GitView::builder().is_issue(true).build();
+            let handler = GitView::builder().with_issue(true).build();
             let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
             let expected_final_url = "https://github.com/sgoudham/git-view/issues/1234";
             let mock = MockGitTrait::default();
@@ -804,7 +855,7 @@ mod lib_tests {
 
         #[test]
         fn is_normal_branch() {
-            let handler = GitView::builder().is_issue(false).build();
+            let handler = GitView::builder().with_issue(false).build();
             let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
             let expected_final_url = "https://github.com/sgoudham/git-view/tree/%23test%23";
             let mock = MockGitTrait::default();

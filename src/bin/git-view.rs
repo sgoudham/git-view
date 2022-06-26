@@ -1,6 +1,6 @@
 use std::panic::set_hook;
 
-use clap::{command, crate_authors, crate_description, crate_version, Arg, Command, ErrorKind};
+use clap::{command, crate_authors, crate_version, Arg, Command, ErrorKind};
 use git_view::Git;
 use git_view::GitView;
 
@@ -44,11 +44,11 @@ This currently supports the following URLs:
         )
         .arg(
             Arg::new("commit")
-                .long_help("The commit to view git repository on\n[default: latest]")
+                .long_help("The commit to view git repository on\n[default: current commit]")
                 .short('c')
                 .long("commit")
                 .value_name("hash")
-                .default_missing_value("latest")
+                .default_missing_value("current")
                 .conflicts_with_all(&["remote", "branch"])
                 .display_order(3),
         )

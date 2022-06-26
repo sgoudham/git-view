@@ -225,7 +225,7 @@ impl<'a> GitView<'a> {
 
         // Handle commit flag
         if let Some(commit) = self.commit {
-            if commit == "latest" {
+            if commit == "current" {
                 let commit_hash = match git.get_current_commit()? {
                     GitOutput::Ok(hash) => Ok(hash),
                     GitOutput::Err(err) => Err(AppError::new(ErrorType::CommandFailed, err)),
@@ -770,7 +770,7 @@ mod lib_tests {
 
         #[test]
         fn is_latest_commit() {
-            let handler = GitView::builder().with_commit("latest").build();
+            let handler = GitView::builder().with_commit("current").build();
             let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
             let expected_final_url = "https://github.com/sgoudham/git-view/tree/commit_hash";
             let mut mock = MockGitTrait::default();

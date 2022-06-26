@@ -6,7 +6,7 @@ on:
 
 name: deploy
 env:
-  BIN: mdbook-template
+  BIN: git-view
 
 jobs:
   install-cross:

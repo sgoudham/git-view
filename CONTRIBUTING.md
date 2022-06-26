@@ -1,4 +1,4 @@
-# Contributing to mdbook-template
+# Contributing to git-view
 
 Thank you for your interest in contributing to this project! I really appreciate it!
 

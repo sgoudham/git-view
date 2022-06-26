@@ -16,8 +16,7 @@ fn main() {
     let matches = Command::new("git-view")
         .version(crate_version!())
         .author(crate_authors!())
-        .about(crate_description!())
-        .long_about(
+        .about(
             "A git sub-command to view your git repository in the browser.
 
 This currently supports the following URLs:
@@ -27,7 +26,6 @@ This currently supports the following URLs:
         )
         .arg(
             Arg::new("remote")
-                .help("The remote to view git repository on [default: default remote]")
                 .long_help("The remote to view git repository on\n[default: default remote]")
                 .short('r')
                 .long("remote")
@@ -37,7 +35,6 @@ This currently supports the following URLs:
         )
         .arg(
             Arg::new("branch")
-                .help("The branch to view git repository on [default: current branch]")
                 .long_help("The branch to view git repository on\n[default: current branch]")
                 .short('b')
                 .long("branch")
@@ -47,7 +44,6 @@ This currently supports the following URLs:
         )
         .arg(
             Arg::new("commit")
-                .help("The commit to view git repository on [default: latest]")
                 .long_help("The commit to view git repository on\n[default: latest]")
                 .short('c')
                 .long("commit")
@@ -58,7 +54,7 @@ This currently supports the following URLs:
         )
         .arg(
             Arg::new("suffix")
-                .help("A suffix to append onto the git repository URL")
+                .long_help("A suffix to append onto the git repository URL")
                 .short('s')
                 .long("suffix")
                 .value_name("suffix")
@@ -67,14 +63,14 @@ This currently supports the following URLs:
         )
         .arg(
             Arg::new("issue")
-                .help("Attempt to parse issue number and open issue link")
+                .long_help("Attempt to parse issue number and open issue link")
                 .short('i')
                 .long("issue")
                 .display_order(5),
         )
         .arg(
             Arg::new("print")
-                .help("Don't open browser and print the URL")
+                .long_help("Don't open browser and print the URL")
                 .short('p')
                 .long("print")
                 .display_order(6),

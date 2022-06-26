@@ -8,3 +8,5 @@
 
 # Leave for libraries 
 /Cargo.lock
+
+.idea

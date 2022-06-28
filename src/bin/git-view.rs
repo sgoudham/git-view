@@ -66,8 +66,6 @@ This currently supports the following URLs:
                 .long_help("Attempt to parse issue number and open issue link")
                 .short('i')
                 .long("issue")
-                .value_name("num")
-                .default_missing_value("branch")
                 .display_order(5),
         )
         .arg(

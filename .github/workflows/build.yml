@@ -18,9 +18,7 @@ jobs:
   windows:
     runs-on: windows-latest
     strategy:
-      fail-fast: false
       matrix:
-        channel: [ stable, beta ]
         target:
           - x86_64-pc-windows-gnu
           - x86_64-pc-windows-msvc
@@ -36,13 +34,13 @@ jobs:
             ~/.cargo/registry
             ./target
           # Example key: windows-stable-x86_64-pc-windows-gnu-3k4j234lksjfd9
-          key: windows-${{ matrix.channel }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          key: windows-stable-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            windows-${{ matrix.channel }}-${{ matrix.target }}-
-            windows-${{ matrix.channel }}-
+            windows-stable-${{ matrix.target }}-
+            windows-stable-
             windows-
       - name: Set Rust Channel
-        run: rustup default ${{ matrix.channel }}
+        run: rustup default stable
         shell: bash
       - name: Set Rust Target
         run: rustup target add ${{ matrix.target }}
@@ -57,9 +55,7 @@ jobs:
   macos:
     runs-on: macos-latest
     strategy:
-      fail-fast: false
       matrix:
-        channel: [ stable, beta ]
         target:
           - x86_64-apple-darwin
           
@@ -74,13 +70,13 @@ jobs:
             ~/.cargo/registry
             ./target
           # Example key: macos-stable-x86_64-apple-darwin-3k4j234lksjfd9
-          key: macos-${{ matrix.channel }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          key: macos-stable-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            macos-${{ matrix.channel }}-${{ matrix.target }}-
-            macos-${{ matrix.channel }}-
+            macos-stable-${{ matrix.target }}-
+            macos-stable-
             macos-
       - name: Set Rust Channel
-        run: rustup default ${{ matrix.channel }}
+        run: rustup default stable 
       - name: Set Rust Target
         run: rustup target add ${{ matrix.target }}
       - name: Build
@@ -93,7 +89,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        channel: [ stable, beta ]
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
@@ -109,13 +104,13 @@ jobs:
             ~/.cargo/registry
             ./target
           # Example key: linux-stable-x86_64-unknown-linux-gnu-3k4j234lksjfd9
-          key: linux-${{ matrix.channel }}-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          key: linux-stable-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            linux-${{ matrix.channel }}-${{ matrix.target }}-
-            linux-${{ matrix.channel }}-
+            linux-stable-${{ matrix.target }}-
+            linux-stable-
             linux-
       - name: Set Rust Channel
-        run: rustup default ${{ matrix.channel }}
+        run: rustup default stable 
       - name: Set Rust Target
         run: rustup target add ${{ matrix.target }}
       - name: Build

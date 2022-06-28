@@ -183,7 +183,6 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "mockall",
- "serde",
  "test-case",
  "url",
  "webbrowser",

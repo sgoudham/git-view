@@ -5,10 +5,10 @@ on:
     # Sequence of patterns matched against refs/tags
     tags:
       - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
-
+      
 env:
   bin: git-view
-
+  
 jobs:
   windows:
     runs-on: windows-latest
@@ -17,7 +17,7 @@ jobs:
         target:
           - x86_64-pc-windows-gnu
           - x86_64-pc-windows-msvc
-
+          
     steps:
       - uses: actions/checkout@v3
       - name: Cache Cargo
@@ -53,14 +53,14 @@ jobs:
           name: Windows
           path: |
             $GITHUB_WORKSPACE/${{ env.bin }}-${{ matrix.target }}.zip
-
+            
   macos:
     runs-on: macos-latest
     strategy:
       matrix:
         target:
           - x86_64-apple-darwin
-
+          
     steps:
       - uses: actions/checkout@v3
       - name: Cache Cargo
@@ -89,7 +89,7 @@ jobs:
           name: macOS
           path: |
             ./${{ env.bin }}-${{ matrix.target }}.tar.gz
-
+            
   linux:
     runs-on: ubuntu-latest
     strategy:
@@ -126,7 +126,7 @@ jobs:
           name: Linux
           path: |
             ./${{ env.bin }}-${{ matrix.target }}.tar.gz
-
+            
   deploy:
     needs: [ windows, macos, linux ]
     runs-on: ubuntu-latest
@@ -144,11 +144,11 @@ jobs:
           files: |
             ./artifacts/*.tar.gz
             ./artifacts/*.zip
-
+            
   homebrew:
     needs: deploy
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Extract Version
         run: |

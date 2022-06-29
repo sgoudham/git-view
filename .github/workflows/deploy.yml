@@ -1,143 +1,168 @@
+name: deploy
+
 on:
   push:
     # Sequence of patterns matched against refs/tags
     tags:
       - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
 
-name: deploy
 env:
-  BIN: git-view
+  bin: git-view
 
 jobs:
-  install-cross:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v1
-        with:
-          fetch-depth: 50
-      - uses: XAMPPRocky/get-github-release@v1
-        id: cross
-        with:
-          owner: rust-embedded
-          repo: cross
-          matches: ${{ matrix.platform }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/upload-artifact@v1
-        with:
-          name: cross-${{ matrix.platform }}
-          path: ${{ steps.cross.outputs.install_path }}
-    strategy:
-      matrix:
-        platform: [ linux-musl, apple-darwin ]
-
   windows:
     runs-on: windows-latest
-    needs: install-cross
     strategy:
       matrix:
         target:
           - x86_64-pc-windows-gnu
           - x86_64-pc-windows-msvc
+
     steps:
-      - uses: actions/checkout@v2
-      - run: bash .github/scripts/set_rust_version.bash stable ${{ matrix.target }}
-      - run: bash .github/scripts/build.bash cargo ${{ matrix.target }} RELEASE
-      - run: |
-          cd ./target/${{ matrix.target }}/release/
-          7z a "${{ env.BIN }}.zip" "${{ env.BIN }}.exe"
-          mv "${{ env.BIN }}.zip" $GITHUB_WORKSPACE
+      - uses: actions/checkout@v3
+      - name: Cache Cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ./target
+          # Example key: windows-stable-x86_64-pc-windows-gnu-3k4j234lksjfd9
+          key: windows-stable-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            windows-stable-${{ matrix.target }}-
+            windows-stable-
+            windows-
+      - name: Set Rust Channel
+        run: rustup default stable
         shell: bash
-      - uses: XAMPPRocky/create-release@v1.0.2
-        id: create_release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set Rust Target
+        run: rustup target add ${{ matrix.target }}
+        shell: bash
+      - name: Build Release Binary
+        run: cargo build --target ${{ matrix.target }} --release
+        shell: bash
+      - name: Compress Windows Binary
+        run: |
+          cd ./target/${{ matrix.target }}/release/
+          7z a "${{ env.bin }}-${{ matrix.target }}.zip" "${{ env.bin }}.exe"
+          mv "${{ env.bin }}-${{ matrix.target }}.zip" $GITHUB_WORKSPACE
+        shell: bash
+      - name: Archive Windows Artifact
+        uses: actions/upload-artifact@v3
         with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
-          draft: false
-          prerelease: false
-      - uses: actions/upload-release-asset@v1
-        id: upload-release-asset
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.BIN }}.zip
-          asset_name: ${{ env.BIN }}-${{ matrix.target }}.zip
-          asset_content_type: application/zip
+          name: Windows
+          path: |
+            ${{ github.workspace }}/${{ env.bin }}-${{ matrix.target }}.zip
 
   macos:
     runs-on: macos-latest
-    needs: install-cross
     strategy:
       matrix:
         target:
           - x86_64-apple-darwin
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v1
-        with:
-          name: cross-apple-darwin
-          path: /usr/local/bin/
-      - run: chmod +x /usr/local/bin/cross
 
-      - run: .github/scripts/set_rust_version.bash stable ${{ matrix.target }}
-      - run: .github/scripts/build.bash cross ${{ matrix.target }} RELEASE
-      - run: tar -czvf ${{ env.BIN }}.tar.gz --directory=target/${{ matrix.target }}/release ${{ env.BIN }}
-      - uses: XAMPPRocky/create-release@v1.0.2
-        id: create_release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Cache Cargo
+        uses: actions/cache@v3
         with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
-          draft: false
-          prerelease: false
-      - uses: actions/upload-release-asset@v1
-        id: upload-release-asset
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          path: |
+            ~/.cargo/registry
+            ./target
+          # Example key: macos-stable-x86_64-apple-darwin-3k4j234lksjfd9
+          key: macos-stable-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            macos-stable-${{ matrix.target }}-
+            macos-stable-
+            macos-
+      - name: Set Rust Channel
+        run: rustup default stable 
+      - name: Set Rust Target
+        run: rustup target add ${{ matrix.target }}
+      - name: Build Release Binary
+        run: cargo build --target ${{ matrix.target }} --release
+      - name: Compress macOS Binary
+        run: tar -czvf ${{ env.bin }}-${{ matrix.target }}.tar.gz --directory=target/${{ matrix.target }}/release ${{ env.bin }}
+      - name: Archive macOS Artifact
+        uses: actions/upload-artifact@v3
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.BIN }}.tar.gz
-          asset_name: ${{ env.BIN }}-${{ matrix.target }}.tar.gz
-          asset_content_type: application/gzip
+          name: macOS
+          path: |
+            ./${{ env.bin }}-${{ matrix.target }}.tar.gz
 
   linux:
     runs-on: ubuntu-latest
-    needs: install-cross
     strategy:
       matrix:
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v1
-        with:
-          name: cross-linux-musl
-          path: /tmp/
-      - run: chmod +x /tmp/cross
 
-      - run: .github/scripts/set_rust_version.bash stable ${{ matrix.target }}
-      - run: .github/scripts/build.bash /tmp/cross ${{ matrix.target }} RELEASE
-      - run: tar -czvf ${{ env.BIN }}.tar.gz --directory=target/${{ matrix.target }}/release ${{ env.BIN }}
-      - uses: XAMPPRocky/create-release@v1.0.2
-        id: create_release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Cache Cargo
+        uses: actions/cache@v3
         with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
-          draft: false
-          prerelease: false
-      - name: Upload Release Asset
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          path: |
+            ~/.cargo/registry
+            ./target
+          # Example key: linux-stable-x86_64-unknown-linux-gnu-3k4j234lksjfd9
+          key: linux-stable-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            linux-stable-${{ matrix.target }}-
+            linux-stable-
+            linux-
+      - name: Set Rust Channel
+        run: rustup default stable 
+      - name: Set Rust Target
+        run: rustup target add ${{ matrix.target }}
+      - name: Build Release Binary
+        run: cargo build --target ${{ matrix.target }} --release
+      - name: Compress Linux Binary
+        run: tar -czvf ${{ env.bin }}-${{ matrix.target }}.tar.gz --directory=target/${{ matrix.target }}/release ${{ env.bin }}
+      - name: Archive Linux Artifact
+        uses: actions/upload-artifact@v3
         with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ${{ env.BIN }}.tar.gz
-          asset_name: ${{ env.BIN }}-${{ matrix.target }}.tar.gz
-          asset_content_type: application/gzip
+          name: Linux
+          path: |
+            ./${{ env.bin }}-${{ matrix.target }}.tar.gz
+
+  deploy-artifacts:
+    needs: [ windows, macos, linux ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v3
+      - name: Display Structure
+        run: ls -R
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./Linux/*.tar.gz
+            ./macOS/*.tar.gz
+            ./Windows/*.zip
+
+  homebrew:
+    needs: deploy-artifacts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract Version
+        run: |
+          printf "::set-output name=%s::%s\n" tag-name "${GITHUB_REF#refs/tags/}"
+      - uses: mislav/bump-homebrew-formula-action@v1
+        if: "!contains(github.ref, '-')" # Skip Pre-Releases
+        with:
+          create-pullrequest: true
+          formula-name: ${{ env.bin }}
+          formula-path: Formula/${{ env.bin }}.rb
+          homebrew-tap: sgoudham/homebrew-tap
+          download-url: https://github.com/sgoudham/${{ env.bin }}/releases/download/${{ steps.extract-version.outputs.tag-name }}/${{ env.bin }}-x86_64-apple-darwin.tar.gz
+          commit-message: |
+            {{formulaName}} -> {{version}}
+            
+            Created by https://github.com/mislav/bump-homebrew-formula-action
+        env:
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW }}

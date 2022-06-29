@@ -17,6 +17,7 @@ jobs:
         target:
           - x86_64-pc-windows-gnu
           - x86_64-pc-windows-msvc
+
     steps:
       - uses: actions/checkout@v3
       - name: Cache Cargo
@@ -59,6 +60,7 @@ jobs:
       matrix:
         target:
           - x86_64-apple-darwin
+
     steps:
       - uses: actions/checkout@v3
       - name: Cache Cargo
@@ -95,6 +97,7 @@ jobs:
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
+
     steps:
       - uses: actions/checkout@v3
       - name: Cache Cargo
@@ -127,23 +130,24 @@ jobs:
   deploy-artifacts:
     needs: [ windows, macos, linux ]
     runs-on: ubuntu-latest
+
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v3
-        with:
-          path: ./artifacts
       - name: Display Structure
         run: ls -R
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ./artifacts/*.tar.gz
-            ./artifacts/*.zip
+            ./Linux/*.tar.gz
+            ./Windows/*.tar.gz
+            ./macOS/*.zip
 
   homebrew:
     needs: deploy-artifacts
     runs-on: ubuntu-latest
+
     steps:
       - name: Extract Version
         run: |

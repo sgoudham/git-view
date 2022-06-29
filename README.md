@@ -9,7 +9,7 @@
 
 ## About
 
-Are you _also_ frustrated from moving your hands away from the keyboard to view your git repository in the browser? 
+Are you _**also**_ frustrated from moving your hands away from the keyboard to view your git repository in the browser? 
 
 > Me too!
 

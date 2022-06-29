@@ -5,10 +5,10 @@ on:
     # Sequence of patterns matched against refs/tags
     tags:
       - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
-      
+
 env:
   bin: git-view
-  
+
 jobs:
   windows:
     runs-on: windows-latest
@@ -17,7 +17,6 @@ jobs:
         target:
           - x86_64-pc-windows-gnu
           - x86_64-pc-windows-msvc
-          
     steps:
       - uses: actions/checkout@v3
       - name: Cache Cargo
@@ -53,14 +52,13 @@ jobs:
           name: Windows
           path: |
             $GITHUB_WORKSPACE/${{ env.bin }}-${{ matrix.target }}.zip
-            
+
   macos:
     runs-on: macos-latest
     strategy:
       matrix:
         target:
           - x86_64-apple-darwin
-          
     steps:
       - uses: actions/checkout@v3
       - name: Cache Cargo
@@ -89,7 +87,7 @@ jobs:
           name: macOS
           path: |
             ./${{ env.bin }}-${{ matrix.target }}.tar.gz
-            
+
   linux:
     runs-on: ubuntu-latest
     strategy:
@@ -97,7 +95,6 @@ jobs:
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
-          
     steps:
       - uses: actions/checkout@v3
       - name: Cache Cargo
@@ -126,11 +123,10 @@ jobs:
           name: Linux
           path: |
             ./${{ env.bin }}-${{ matrix.target }}.tar.gz
-            
-  deploy:
+
+  deploy-artifacts:
     needs: [ windows, macos, linux ]
     runs-on: ubuntu-latest
-    
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v3
@@ -144,11 +140,10 @@ jobs:
           files: |
             ./artifacts/*.tar.gz
             ./artifacts/*.zip
-            
+
   homebrew:
-    needs: deploy
+    needs: deploy-artifacts
     runs-on: ubuntu-latest
-    
     steps:
       - name: Extract Version
         run: |

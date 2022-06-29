@@ -1,0 +1,169 @@
+name: test
+
+on:
+  push:
+    # Sequence of patterns matched against refs/tags
+    tags:
+      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
+
+env:
+  bin: git-view
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-pc-windows-gnu
+          - x86_64-pc-windows-msvc
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Cache Cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ./target
+          # Example key: windows-stable-x86_64-pc-windows-gnu-3k4j234lksjfd9
+          key: windows-stable-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            windows-stable-${{ matrix.target }}-
+            windows-stable-
+            windows-
+      - name: Set Rust Channel
+        run: rustup default stable
+        shell: bash
+      - name: Set Rust Target
+        run: rustup target add ${{ matrix.target }}
+        shell: bash
+      - name: Build Release Binary
+        run: cargo build --target ${{ matrix.target }} --release
+        shell: bash
+      - name: Compress Windows Binary
+      - run: |
+          cd ./target/${{ matrix.target }}/release/
+          7z a "${{ env.bin }}-${{ matrix.target }}.zip" "${{ env.bin }}.exe"
+          mv "${{ env.bin }}-${{ matrix.target }}.zip" $GITHUB_WORKSPACE
+        shell: bash
+      - name: Archive Windows Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Windows
+          path: |
+            $GITHUB_WORKSPACE/${{ env.bin }}-${{ matrix.target }}.zip
+
+  macos:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-apple-darwin
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Cache Cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ./target
+          # Example key: macos-stable-x86_64-apple-darwin-3k4j234lksjfd9
+          key: macos-stable-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            macos-stable-${{ matrix.target }}-
+            macos-stable-
+            macos-
+      - name: Set Rust Channel
+        run: rustup default stable 
+      - name: Set Rust Target
+        run: rustup target add ${{ matrix.target }}
+      - name: Build Release Binary
+        run: cargo build --target ${{ matrix.target }} --release
+      - name: Compress macOS Binary
+        run: tar -czvf ${{ env.bin }}-${{ matrix.target }}.tar.gz --directory=target/${{ matrix.target }}/release ${{ env.bin }}
+      - name: Archive macOS Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: macOS
+          path: |
+            ./${{ env.bin }}-${{ matrix.target }}.tar.gz
+
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+          - x86_64-unknown-linux-musl
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Cache Cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ./target
+          # Example key: linux-stable-x86_64-unknown-linux-gnu-3k4j234lksjfd9
+          key: linux-stable-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            linux-stable-${{ matrix.target }}-
+            linux-stable-
+            linux-
+      - name: Set Rust Channel
+        run: rustup default stable 
+      - name: Set Rust Target
+        run: rustup target add ${{ matrix.target }}
+      - name: Build Release Binary
+        run: cargo build --target ${{ matrix.target }} --release
+      - name: Compress Linux Binary
+        run: tar -czvf ${{ env.bin }}-${{ matrix.target }}.tar.gz --directory=target/${{ matrix.target }}/release ${{ env.bin }}
+      - name: Archive Linux Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: Linux
+          path: |
+            ./${{ env.bin }}-${{ matrix.target }}.tar.gz
+
+  deploy:
+    needs: [ windows, macos, linux ]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: ./artifacts
+      - name: Display Structure
+        run: ls -R
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./artifacts/*.tar.gz
+            ./artifacts/*.zip
+
+  homebrew:
+    needs: deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract Version
+        run: |
+          printf "::set-output name=%s::%s\n" tag-name "${GITHUB_REF#refs/tags/}"
+      - uses: mislav/bump-homebrew-formula-action@v1
+        if: "!contains(github.ref, '-')" # Skip Pre-Releases
+        with:
+          create-pullrequest: true
+          formula-name: ${{ env.bin }}
+          formula-path: Formula/${{ env.bin }}.rb
+          homebrew-tap: sgoudham/homebrew-tap
+          download-url: https://github.com/sgoudham/${{ env.bin }}/releases/download/${{ steps.extract-version.outputs.tag-name }}/${{ env.bin }}-x86_64-apple-darwin.tar.gz
+          commit-message: |
+            {{formulaName}} -> {{version}}
+            
+            Created by https://github.com/mislav/bump-homebrew-formula-action
+        env:
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW }}

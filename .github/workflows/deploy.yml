@@ -42,7 +42,7 @@ jobs:
         run: cargo build --target ${{ matrix.target }} --release
         shell: bash
       - name: Compress Windows Binary
-      - run: |
+        run: |
           cd ./target/${{ matrix.target }}/release/
           7z a "${{ env.bin }}-${{ matrix.target }}.zip" "${{ env.bin }}.exe"
           mv "${{ env.bin }}-${{ matrix.target }}.zip" $GITHUB_WORKSPACE

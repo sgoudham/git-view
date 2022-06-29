@@ -141,8 +141,8 @@ jobs:
         with:
           files: |
             ./Linux/*.tar.gz
-            ./Windows/*.tar.gz
-            ./macOS/*.zip
+            ./macOS/*.tar.gz
+            ./Windows/*.zip
 
   homebrew:
     needs: deploy-artifacts

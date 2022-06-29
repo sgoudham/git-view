@@ -17,7 +17,6 @@ jobs:
         target:
           - x86_64-pc-windows-gnu
           - x86_64-pc-windows-msvc
-
     steps:
       - uses: actions/checkout@v3
       - name: Cache Cargo
@@ -60,7 +59,6 @@ jobs:
       matrix:
         target:
           - x86_64-apple-darwin
-
     steps:
       - uses: actions/checkout@v3
       - name: Cache Cargo
@@ -97,7 +95,6 @@ jobs:
         target:
           - x86_64-unknown-linux-gnu
           - x86_64-unknown-linux-musl
-
     steps:
       - uses: actions/checkout@v3
       - name: Cache Cargo
@@ -130,7 +127,6 @@ jobs:
   deploy-artifacts:
     needs: [ windows, macos, linux ]
     runs-on: ubuntu-latest
-
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v3
@@ -148,7 +144,6 @@ jobs:
   homebrew:
     needs: deploy-artifacts
     runs-on: ubuntu-latest
-
     steps:
       - name: Extract Version
         run: |

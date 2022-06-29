@@ -6,6 +6,8 @@ on:
       - 'src/**'
       - 'tests/**'
       - '.github/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
     branches:
       - '**'
   pull_request:
@@ -13,6 +15,8 @@ on:
       - 'src/**'
       - 'tests/**'
       - '.github/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
 
 jobs:
   windows:

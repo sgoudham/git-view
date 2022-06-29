@@ -51,7 +51,7 @@ jobs:
         with:
           name: Windows
           path: |
-            $GITHUB_WORKSPACE/${{ env.bin }}-${{ matrix.target }}.zip
+            ${{ github.workspace }}/${{ env.bin }}-${{ matrix.target }}.zip
 
   macos:
     runs-on: macos-latest

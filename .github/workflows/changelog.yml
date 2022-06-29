@@ -1,7 +1,7 @@
 name: Generate CHANGELOG
 on:
   release:
-    types: [published]
+    types: [released]
 
 jobs:
   generate-changelog:

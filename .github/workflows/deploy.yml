@@ -134,14 +134,16 @@ jobs:
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v3
+        with:
+          path: ./artifacts
       - name: Display Structure
         run: ls -R
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ./*.tar.gz
-            ./*.zip
+            ./artifacts/*.tar.gz
+            ./artifacts/*.zip
 
   homebrew:
     needs: deploy

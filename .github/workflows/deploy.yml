@@ -44,8 +44,8 @@ jobs:
       - name: Compress Windows Binary
       - run: |
           cd ./target/${{ matrix.target }}/release/
-          7z a "${{ env.bin }}-${{ matrix.target}}.zip" "${{ env.bin }}.exe"
-          mv "${{ env.bin }}-${{ matrix.target}}.zip" $GITHUB_WORKSPACE
+          7z a "${{ env.bin }}-${{ matrix.target }}.zip" "${{ env.bin }}.exe"
+          mv "${{ env.bin }}-${{ matrix.target }}.zip" $GITHUB_WORKSPACE
         shell: bash
       - name: Archive Windows Artifact
         uses: actions/upload-artifact@v3

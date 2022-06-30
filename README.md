@@ -11,7 +11,7 @@
 
 Are you _**also**_ frustrated from moving your hands away from the keyboard to view your git repository in the browser? 
 
-> Me too!
+> Me too!!!
 
 `git-view` alleviates that pain by allowing you to chuck away your mouse!
 

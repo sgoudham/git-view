@@ -1,6 +1,6 @@
 use std::panic::set_hook;
 
-use clap::{command, crate_authors, crate_version, Arg, Command, ErrorKind};
+use clap::{command, crate_description, crate_authors, crate_version, Arg, Command, ErrorKind};
 use git_view::Git;
 use git_view::GitView;
 
@@ -16,14 +16,7 @@ fn main() {
     let matches = Command::new("git-view")
         .version(crate_version!())
         .author(crate_authors!())
-        .about(
-            "A git sub-command to view your git repository in the browser.
-
-This currently supports the following URLs:
-    - github.com
-    - bitbucket.org
-",
-        )
+        .about(crate_description!())
         .arg(
             Arg::new("remote")
                 .long_help("The remote to view git repository on\n[default: default remote]")

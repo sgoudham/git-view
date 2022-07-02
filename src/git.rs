@@ -1,4 +1,3 @@
-use core::fmt;
 use std::{
     borrow::Cow,
     process::{Command, Output},
@@ -15,15 +14,9 @@ pub(crate) enum Local<'a> {
 }
 
 #[derive(Debug)]
-pub(crate) enum Domain {
-    GitHub,
-    BitBucket,
-}
-
-#[derive(Debug)]
 pub(crate) struct Url {
     pub(crate) protocol: String,
-    pub(crate) domain: Domain,
+    pub(crate) domain: String,
     pub(crate) path: String,
 }
 
@@ -163,36 +156,11 @@ fn trim(bytes: &[u8]) -> Result<String, AppError> {
 }
 
 impl Url {
-    pub(crate) fn new(protocol: &str, domain: Domain, path: &str) -> Self {
+    pub(crate) fn new(protocol: &str, domain: &str, path: &str) -> Self {
         Self {
             protocol: protocol.into(),
-            domain,
+            domain: domain.into(),
             path: path.into(),
-        }
-    }
-}
-
-impl Domain {
-    pub(crate) fn from_str(s: &str) -> Self {
-        if s == "bitbucket.org" {
-            Domain::BitBucket
-        } else {
-            Domain::GitHub
-        }
-    }
-}
-
-impl PartialEq for Domain {
-    fn eq(&self, other: &Self) -> bool {
-        self.to_string() == other.to_string()
-    }
-}
-
-impl fmt::Display for Domain {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Domain::GitHub => write!(f, "github.com"),
-            Domain::BitBucket => write!(f, "bitbucket.org"),
         }
     }
 }

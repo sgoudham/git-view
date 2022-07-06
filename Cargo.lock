@@ -143,7 +143,7 @@ checksum = "85dcb89d2b10c5f6133de2efd8c11959ce9dbb46a2f7a4cab208c4eeda6ce1ab"
 
 [[package]]
 name = "git-view"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "clap",
  "mockall",

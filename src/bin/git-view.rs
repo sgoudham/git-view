@@ -70,7 +70,7 @@ fn main() {
         );
 
     let matches = matches.get_matches();
-    let mut git_view = GitView::new(
+    let git_view = GitView::new(
         matches.value_of("branch"),
         matches.value_of("remote"),
         matches.value_of("commit"),

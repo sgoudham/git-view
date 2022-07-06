@@ -37,25 +37,18 @@ impl<'a> GitView<'a> {
         }
     }
 
-    pub fn view_repository(&mut self, git: impl GitTrait) -> Result<(), AppError> {
-        // Exit out if we're not inside a git repository
+    pub fn view_repository(&self, git: impl GitTrait) -> Result<(), AppError> {
         self.is_valid_repository(&git)?;
-        // Retrieve the current local ref (branch or not branch)
         let local_ref = self.get_local_ref(&git)?;
-        // Retrieve the remote
         let remote = self.populate_remote(&local_ref, &git)?;
-        // Retrieve the remote reference
         let remote_ref = self.get_remote_reference(&local_ref, &remote, &git)?;
 
         // Retrieve the full git_url
         // e.g https://github.com/sgoudham/git-view.git
         let git_url = self.get_git_url(&remote, &git)?;
-        // Extract protocol, domain and urlpath
         let url = self.parse_git_url(&git_url)?;
-        // Generate final url to open in the web browser
         let final_url = self.generate_final_url(&remote_ref, &url, &git)?;
 
-        // Display OR Open the URL
         if self.is_print {
             println!("{}", final_url);
         } else {

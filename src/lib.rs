@@ -4,7 +4,7 @@ mod git;
 use std::borrow::Cow;
 
 use error::{AppError, ErrorType};
-use git::{Domain, GitOutput, GitTrait, Local, Url};
+use git::{GitOutput, GitTrait, Local, Url};
 
 pub use git::Git;
 
@@ -37,25 +37,18 @@ impl<'a> GitView<'a> {
         }
     }
 
-    pub fn view_repository(&mut self, git: impl GitTrait) -> Result<(), AppError> {
-        // Exit out if we're not inside a git repository
+    pub fn view_repository(&self, git: impl GitTrait) -> Result<(), AppError> {
         self.is_valid_repository(&git)?;
-        // Retrieve the current local ref (branch or not branch)
         let local_ref = self.get_local_ref(&git)?;
-        // Retrieve the remote
         let remote = self.populate_remote(&local_ref, &git)?;
-        // Retrieve the remote reference
         let remote_ref = self.get_remote_reference(&local_ref, &remote, &git)?;
 
         // Retrieve the full git_url
         // e.g https://github.com/sgoudham/git-view.git
         let git_url = self.get_git_url(&remote, &git)?;
-        // Extract protocol, domain and urlpath
         let url = self.parse_git_url(&git_url)?;
-        // Generate final url to open in the web browser
         let final_url = self.generate_final_url(&remote_ref, &url, &git)?;
 
-        // Display OR Open the URL
         if self.is_print {
             println!("{}", final_url);
         } else {
@@ -184,7 +177,7 @@ impl<'a> GitView<'a> {
             match url::Url::parse(git_url) {
                 Ok(url) => Ok(Url::new(
                     url.scheme(),
-                    Domain::from_str(url.host_str().map_or_else(|| "github.com", |host| host)),
+                    url.host_str().map_or_else(|| "github.com", |host| host),
                     url.path()
                         .trim_start_matches('/')
                         .trim_end_matches('/')
@@ -205,7 +198,7 @@ impl<'a> GitView<'a> {
                         None => domain,
                     };
 
-                    Ok(Url::new(protocol, Domain::from_str(split_domain), path))
+                    Ok(Url::new(protocol, split_domain, path))
                 }
                 None => Err(AppError::new(
                     ErrorType::InvalidGitUrl,
@@ -239,17 +232,10 @@ impl<'a> GitView<'a> {
         }
 
         // Handle issue flag and no flags
-        let branch_ref = match &url.domain {
-            Domain::GitHub => {
-                if self.is_issue {
-                    format!("/issues/{}", capture_digits(remote_ref))
-                } else {
-                    format!("/tree/{}", escape_ascii_chars(remote_ref))
-                }
-            }
-            Domain::BitBucket => {
-                format!("/src/{}", remote_ref)
-            }
+        let branch_ref = if self.is_issue {
+            format!("/issues/{}", capture_digits(remote_ref))
+        } else {
+            format!("/tree/{}", escape_ascii_chars(remote_ref))
         };
 
         if remote_ref != "master" && remote_ref != "main" {
@@ -725,7 +711,7 @@ mod lib_tests {
             let url = handler.parse_git_url(git_url)?;
 
             assert_eq!(url.protocol, "https");
-            assert_eq!(url.domain.to_string(), "github.com");
+            assert_eq!(url.domain, "github.com");
             assert_eq!(url.path, "sgoudham/git-view");
 
             Ok(())
@@ -740,7 +726,7 @@ mod lib_tests {
             let url = handler.parse_git_url(git_url)?;
 
             assert_eq!(url.protocol, "https");
-            assert_eq!(url.domain.to_string(), "github.com");
+            assert_eq!(url.domain, "github.com");
             assert_eq!(url.path, "sgoudham/git-view");
 
             Ok(())
@@ -763,7 +749,7 @@ mod lib_tests {
 
     mod generate_final_url {
         use crate::{
-            git::{Domain, GitOutput, MockGitTrait, Url},
+            git::{GitOutput, MockGitTrait, Url},
             GitView,
         };
         use test_case::test_case;
@@ -771,7 +757,7 @@ mod lib_tests {
         #[test]
         fn is_latest_commit() {
             let handler = GitView::builder().with_commit("current").build();
-            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let url = Url::new("https", "github.com", "sgoudham/git-view");
             let expected_final_url = "https://github.com/sgoudham/git-view/tree/commit_hash";
             let mut mock = MockGitTrait::default();
 
@@ -789,7 +775,7 @@ mod lib_tests {
             let handler = GitView::builder()
                 .with_commit("8s2jl250as7f234jasfjj")
                 .build();
-            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let url = Url::new("https", "github.com", "sgoudham/git-view");
             let expected_final_url =
                 "https://github.com/sgoudham/git-view/tree/8s2jl250as7f234jasfjj";
             let mock = MockGitTrait::default();
@@ -800,37 +786,11 @@ mod lib_tests {
             assert_eq!(actual_final_url.unwrap(), expected_final_url);
         }
 
-        #[test]
-        fn is_bitbucket() {
-            let handler = GitView::default();
-            let url = Url::new("https", Domain::BitBucket, "sgoudham/git-view");
-            let expected_final_url = "https://bitbucket.org/sgoudham/git-view/src/dev";
-            let mock = MockGitTrait::default();
-
-            let actual_final_url = handler.generate_final_url("dev", &url, &mock);
-
-            assert!(actual_final_url.is_ok());
-            assert_eq!(actual_final_url.unwrap(), expected_final_url);
-        }
-
-        #[test]
-        fn is_github() {
-            let handler = GitView::default();
-            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
-            let expected_final_url = "https://github.com/sgoudham/git-view/tree/dev";
-            let mock = MockGitTrait::default();
-
-            let actual_final_url = handler.generate_final_url("dev", &url, &mock);
-
-            assert!(actual_final_url.is_ok());
-            assert_eq!(actual_final_url.unwrap(), expected_final_url);
-        }
-
         #[test_case("main" ; "main")]
         #[test_case("master" ; "master")]
         fn is_master_or_main(branch: &str) {
             let handler = GitView::default();
-            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let url = Url::new("https", "github.com", "sgoudham/git-view");
             let expected_final_url = "https://github.com/sgoudham/git-view";
             let mock = MockGitTrait::default();
 
@@ -843,7 +803,7 @@ mod lib_tests {
         #[test]
         fn is_user_issue() {
             let handler = GitView::builder().with_issue(true).build();
-            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let url = Url::new("https", "github.com", "sgoudham/git-view");
             let expected_final_url = "https://github.com/sgoudham/git-view/issues/1234";
             let mock = MockGitTrait::default();
 
@@ -856,7 +816,7 @@ mod lib_tests {
         #[test]
         fn is_normal_branch() {
             let handler = GitView::builder().with_issue(false).build();
-            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let url = Url::new("https", "github.com", "sgoudham/git-view");
             let expected_final_url = "https://github.com/sgoudham/git-view/tree/%23test%23";
             let mock = MockGitTrait::default();
 
@@ -870,7 +830,7 @@ mod lib_tests {
         #[test_case("dev", "https://github.com/sgoudham/git-view/tree/dev/releases" ; "with_branch_dev")]
         fn with_suffix(remote_ref: &str, expected_final_url: &str) {
             let handler = GitView::builder().with_suffix("/releases").build();
-            let url = Url::new("https", Domain::GitHub, "sgoudham/git-view");
+            let url = Url::new("https", "github.com", "sgoudham/git-view");
             let mock = MockGitTrait::default();
 
             let actual_final_url = handler.generate_final_url(remote_ref, &url, &mock);

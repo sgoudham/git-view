@@ -21,7 +21,6 @@ Are you _**also**_ frustrated from moving your hands away from the keyboard to v
 
 ## Features
 
-- [x] GitHub & BitBucket
 - [x] View Branches, Commits & Issues
 - [x] Custom Suffix
 - [x] Custom Remote

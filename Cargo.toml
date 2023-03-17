@@ -20,7 +20,7 @@ path = "src/lib.rs"
 [dependencies]
 clap = { version = '3.1.18', features = ["cargo"] }
 url = { version = '2.3.1' }
-webbrowser = { version = '0.8.2' }
+webbrowser = { version = '0.8.8' }
 
 [dev-dependencies]
 test-case = { version = '2.2.2' }

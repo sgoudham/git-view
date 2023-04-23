@@ -1,19 +1,7 @@
-use std::panic::set_hook;
+use clap::{crate_authors, crate_version, Arg, Command};
 
-use clap::{command, crate_authors, crate_version, Arg, Command, ErrorKind};
-use git_view::Git;
-use git_view::GitView;
-
-macro_rules! clap_panic {
-    ($e:expr) => {
-        command!().error(ErrorKind::DisplayHelp, $e).exit()
-    };
-}
-
-fn main() {
-    set_hook(Box::new(|info| clap_panic!(info)));
-
-    let matches = Command::new("git-view")
+pub fn cmd() -> clap::Command<'static> {
+    Command::new("git-view")
         .version(crate_version!())
         .author(crate_authors!())
         .about(
@@ -74,19 +62,5 @@ This currently supports the following URLs:
                 .short('p')
                 .long("print")
                 .display_order(6),
-        );
-
-    let matches = matches.get_matches();
-    let mut git_view = GitView::new(
-        matches.value_of("branch"),
-        matches.value_of("remote"),
-        matches.value_of("commit"),
-        matches.value_of("suffix"),
-        matches.is_present("issue"),
-        matches.is_present("print"),
-    );
-
-    if let Err(app_error) = git_view.view_repository(Git) {
-        clap_panic!(app_error.error_str);
-    }
+        )
 }

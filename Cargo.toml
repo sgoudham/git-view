@@ -11,7 +11,6 @@ exclude = [".github/**"]
 
 [[bin]]
 name = "git-view"
-path = "src/bin/git-view.rs"
 
 [lib]
 name = "git_view"
@@ -21,6 +20,10 @@ path = "src/lib.rs"
 clap = { version = '3.1.18', features = ["cargo"] }
 url = { version = '2.3.1' }
 webbrowser = { version = '0.8.2' }
+
+[build-dependencies]
+clap = { version = '3.1.18', features = ["cargo"] }
+clap_mangen = "0.1"
 
 [dev-dependencies]
 test-case = { version = '2.2.2' }

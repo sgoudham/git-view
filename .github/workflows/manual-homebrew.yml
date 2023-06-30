@@ -26,7 +26,5 @@ jobs:
             {{formulaName}} -> {{version}}
             
             Created by https://github.com/mislav/bump-homebrew-formula-action
-          download-url: https://example.com/foo/${{ github.event.inputs.tag-name }}.tar.gz
-        env:
         env:
           COMMITTER_TOKEN: ${{ secrets.HOMEBREW }}

@@ -28,7 +28,7 @@ Are you _**also**_ frustrated from moving your hands away from the keyboard to v
 
 ## Installation
 
-Binaries are available for **Windows**, **macOS** and **Linux** [here](https://github.com/sgoudham/git-view/releases/latest)
+Binaries are available [here](https://github.com/sgoudham/git-view/releases/latest).
 
 ### Cargo
 

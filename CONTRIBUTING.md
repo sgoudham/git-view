@@ -1,7 +1,6 @@
 # Contributing to git-view
 
 Thank you for your interest in contributing to this project! I really appreciate it! 
-Feel free to contribute pull requests for any additional features that you want!
 
 # Got a Question?
 

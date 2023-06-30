@@ -56,9 +56,12 @@ fn main() {
         )
         .arg(
             Arg::new("issue")
-                .long_help("Attempt to parse issue number and open issue link")
+                .long_help("The issue number to view\n[default: open issue from remote branch]")
                 .short('i')
                 .long("issue")
+                .default_missing_value("branch")
+                .conflicts_with("commit")
+                .takes_value(true)
                 .display_order(5),
         )
         .arg(
@@ -75,7 +78,7 @@ fn main() {
         matches.value_of("remote"),
         matches.value_of("commit"),
         matches.value_of("suffix"),
-        matches.is_present("issue"),
+        matches.value_of("issue"),
         matches.is_present("print"),
     );
 

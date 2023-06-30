@@ -65,6 +65,9 @@ $ git view --issue
 # Given branch 'TICKET-123' or some other variation
 # View https://github.com/TRACKED_REMOTE_USER/REPO/issues/123
 
+$ git view --issue 42
+# View https://github.com/TRACKED_REMOTE_USER/REPO/issues/42
+
 $ git view --suffix releases
 # Given branch 'TICKET-123' or some other variation
 # View https://github.com/TRACKED_REMOTE_USER/REPO/releases
@@ -91,7 +94,8 @@ OPTIONS:
     -c, --commit <hash>      The commit to view git repository on
                              [default: current commit]
     -s, --suffix <suffix>    A suffix to append onto the git repository URL
-    -i, --issue              Attempt to parse issue number and open issue link
+    -i, --issue <issue>      The issue number to view
+                             [default: open issue from remote branch]
     -p, --print              Don't open browser and print the URL
     -h, --help               Print help information
     -V, --version            Print version information

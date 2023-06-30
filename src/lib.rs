@@ -14,7 +14,7 @@ pub struct GitView<'a> {
     branch: Option<&'a str>,
     commit: Option<&'a str>,
     suffix: Option<&'a str>,
-    is_issue: bool,
+    issue: Option<&'a str>,
     is_print: bool,
 }
 
@@ -24,7 +24,7 @@ impl<'a> GitView<'a> {
         remote: Option<&'a str>,
         commit: Option<&'a str>,
         suffix: Option<&'a str>,
-        is_issue: bool,
+        issue: Option<&'a str>,
         is_print: bool,
     ) -> Self {
         Self {
@@ -32,7 +32,7 @@ impl<'a> GitView<'a> {
             branch,
             commit,
             suffix,
-            is_issue,
+            issue,
             is_print,
         }
     }
@@ -231,15 +231,24 @@ impl<'a> GitView<'a> {
             return Ok(open_url);
         }
 
-        // Handle issue flag and no flags
-        let branch_ref = if self.is_issue {
-            format!("/issues/{}", capture_digits(remote_ref))
+        // Handle issue flag
+        let branch_ref = if let Some(issue) = self.issue {
+            if issue == "branch" {
+                format!("/issues/{}", capture_digits(remote_ref))
+            } else {
+                format!("/issues/{}", issue)
+            }
         } else {
             format!("/tree/{}", escape_ascii_chars(remote_ref))
         };
 
         if remote_ref != "master" && remote_ref != "main" {
             open_url.push_str(&branch_ref);
+        } else {
+            // Edge Case: If the branch is master/main, still append "/issues"
+            if self.issue.is_some() {
+                open_url.push_str("/issues");
+            }
         }
 
         if let Some(suffix) = self.suffix {
@@ -312,7 +321,7 @@ mod lib_tests {
         branch: Option<&'a str>,
         commit: Option<&'a str>,
         suffix: Option<&'a str>,
-        is_issue: bool,
+        issue: Option<&'a str>,
         is_print: bool,
     }
 
@@ -337,8 +346,8 @@ mod lib_tests {
             self
         }
 
-        pub(crate) fn with_issue(mut self, is_issue: bool) -> Self {
-            self.is_issue = is_issue;
+        pub(crate) fn with_issue(mut self, issue: &'a str) -> Self {
+            self.issue = Some(issue);
             self
         }
 
@@ -348,7 +357,7 @@ mod lib_tests {
                 self.remote,
                 self.commit,
                 self.suffix,
-                self.is_issue,
+                self.issue,
                 self.is_print,
             )
         }
@@ -800,9 +809,24 @@ mod lib_tests {
             assert_eq!(actual_final_url.unwrap(), expected_final_url);
         }
 
+        #[test_case("main" ; "main")]
+        #[test_case("master" ; "master")]
+        fn is_master_or_main_with_issue_flag(branch: &str) {
+            let handler = GitView::builder().with_issue("branch").build();
+            let url = Url::new("https", "github.com", "sgoudham/git-view");
+            let expected_final_url = "https://github.com/sgoudham/git-view/issues";
+            let mock = MockGitTrait::default();
+
+            let actual_final_url = handler.generate_final_url(branch, &url, &mock);
+
+            assert!(actual_final_url.is_ok());
+            assert_eq!(actual_final_url.unwrap(), expected_final_url);
+        }
+
+
         #[test]
         fn is_user_issue() {
-            let handler = GitView::builder().with_issue(true).build();
+            let handler = GitView::builder().with_issue("branch").build();
             let url = Url::new("https", "github.com", "sgoudham/git-view");
             let expected_final_url = "https://github.com/sgoudham/git-view/issues/1234";
             let mock = MockGitTrait::default();
@@ -814,8 +838,21 @@ mod lib_tests {
         }
 
         #[test]
+        fn is_user_issue_with_args() {
+            let handler = GitView::builder().with_issue("42").build();
+            let url = Url::new("https", "github.com", "sgoudham/git-view");
+            let expected_final_url = "https://github.com/sgoudham/git-view/issues/42";
+            let mock = MockGitTrait::default();
+
+            let actual_final_url = handler.generate_final_url("mock ref", &url, &mock);
+
+            assert!(actual_final_url.is_ok());
+            assert_eq!(actual_final_url.unwrap(), expected_final_url);
+        }
+
+        #[test]
         fn is_normal_branch() {
-            let handler = GitView::builder().with_issue(false).build();
+            let handler = GitView::builder().build();
             let url = Url::new("https", "github.com", "sgoudham/git-view");
             let expected_final_url = "https://github.com/sgoudham/git-view/tree/%23test%23";
             let mock = MockGitTrait::default();

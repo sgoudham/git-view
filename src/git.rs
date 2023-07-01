@@ -33,6 +33,7 @@ pub(crate) enum GitCommand<'a> {
     IsValidRemote(&'a str),
     CurrentTag,
     CurrentCommit,
+    CurrentWorkingDirectory,
 }
 
 pub enum GitOutput {
@@ -51,6 +52,7 @@ pub trait GitTrait {
     fn is_valid_remote(&self, remote: &str) -> Result<GitOutput, AppError>;
     fn get_current_tag(&self) -> Result<GitOutput, AppError>;
     fn get_current_commit(&self) -> Result<GitOutput, AppError>;
+    fn get_current_working_directory(&self) -> Result<GitOutput, AppError>;
 }
 
 impl GitTrait for Git {
@@ -88,6 +90,10 @@ impl GitTrait for Git {
 
     fn get_current_commit(&self) -> Result<GitOutput, AppError> {
         execute(command(GitCommand::CurrentCommit)?)
+    }
+
+    fn get_current_working_directory(&self) -> Result<GitOutput, AppError> {
+        execute(command(GitCommand::CurrentWorkingDirectory)?)
     }
 }
 
@@ -131,6 +137,10 @@ fn command(git_command: GitCommand) -> Result<Output, std::io::Error> {
             .arg("--exact-match")
             .output(),
         GitCommand::CurrentCommit => Command::new("git").arg("rev-parse").arg("HEAD").output(),
+        GitCommand::CurrentWorkingDirectory => Command::new("git")
+            .arg("rev-parse")
+            .arg("--show-prefix")
+            .output(),
     }
 }
 

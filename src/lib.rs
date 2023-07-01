@@ -15,6 +15,7 @@ pub struct GitView<'a> {
     commit: Option<&'a str>,
     suffix: Option<&'a str>,
     issue: Option<&'a str>,
+    path: Option<&'a str>,
     is_print: bool,
 }
 
@@ -25,6 +26,7 @@ impl<'a> GitView<'a> {
         commit: Option<&'a str>,
         suffix: Option<&'a str>,
         issue: Option<&'a str>,
+        path: Option<&'a str>,
         is_print: bool,
     ) -> Self {
         Self {
@@ -33,6 +35,7 @@ impl<'a> GitView<'a> {
             commit,
             suffix,
             issue,
+            path,
             is_print,
         }
     }
@@ -215,51 +218,111 @@ impl<'a> GitView<'a> {
         git: &impl GitTrait,
     ) -> Result<String, AppError> {
         let mut open_url = format!("{}://{}/{}", url.protocol, url.domain, url.path);
+        let escaped_remote_ref = escape_ascii_chars(remote_ref);
 
-        // Handle commit flag
+        if let Some(issue) = self.issue {
+            self.handle_issue_flag(issue, &escaped_remote_ref, &mut open_url)?;
+            return Ok(open_url);
+        }
         if let Some(commit) = self.commit {
-            if commit == "current" {
-                let commit_hash = match git.get_current_commit()? {
-                    GitOutput::Ok(hash) => Ok(hash),
-                    GitOutput::Err(err) => Err(AppError::new(ErrorType::CommandFailed, err)),
-                }?;
-                open_url.push_str(format!("/tree/{}", commit_hash).as_str());
-            } else {
-                open_url.push_str(format!("/tree/{}", commit).as_str());
-            }
-
+            self.handle_commit_flag(commit, &mut open_url, git)?;
+            return Ok(open_url);
+        }
+        if let Some(path) = self.path {
+            let prefix = format!("/tree/{}/", escaped_remote_ref);
+            self.handle_path_flag(prefix.as_str(), path, &mut open_url, git)?;
             return Ok(open_url);
         }
 
-        // Handle issue flag
-        let branch_ref = if let Some(issue) = self.issue {
-            if issue == "branch" {
-                format!("/issues/{}", capture_digits(remote_ref))
-            } else {
-                format!("/issues/{}", issue)
-            }
-        } else {
-            format!("/tree/{}", escape_ascii_chars(remote_ref))
-        };
-
-        if remote_ref != "master" && remote_ref != "main" {
-            open_url.push_str(&branch_ref);
-        } else {
-            // Edge Case: If the branch is master/main, still append "/issues"
-            if self.issue.is_some() {
-                open_url.push_str("/issues");
-            }
-        }
-
-        if let Some(suffix) = self.suffix {
-            open_url.push_str(suffix);
-        }
+        println!("{escaped_remote_ref}");
+        open_url.push_str(format!("/tree/{}", escaped_remote_ref).as_str());
+        self.handle_suffix_flag(&mut open_url);
 
         Ok(open_url)
     }
+
+    fn handle_issue_flag(
+        &self,
+        issue: &str,
+        remote_ref: &str,
+        open_url: &mut String,
+    ) -> Result<(), AppError> {
+        if issue == "branch" {
+            if let Some(issue_num) = capture_digits(remote_ref) {
+                open_url.push_str(format!("/issues/{}", issue_num).as_str());
+            } else {
+                open_url.push_str("/issues");
+            }
+        } else {
+            open_url.push_str(format!("/issues/{}", issue).as_str());
+        }
+
+        // no reason why suffix can't be appended after issue
+        self.handle_suffix_flag(open_url);
+
+        Ok(())
+    }
+
+    fn handle_commit_flag(
+        &self,
+        commit: &str,
+        open_url: &mut String,
+        git: &impl GitTrait,
+    ) -> Result<(), AppError> {
+        if commit == "current" {
+            match git.get_current_commit()? {
+                GitOutput::Ok(hash) => {
+                    open_url.push_str(format!("/tree/{}", hash).as_str());
+                }
+                GitOutput::Err(err) => return Err(AppError::new(ErrorType::CommandFailed, err)),
+            };
+        } else {
+            open_url.push_str(format!("/tree/{}", commit).as_str());
+        }
+
+        // path can still be appended after commit hash
+        if let Some(path) = self.path {
+            self.handle_path_flag("/", path, open_url, git)?;
+        }
+
+        Ok(())
+    }
+
+    fn handle_path_flag(
+        &self,
+        prefix: &str,
+        path: &str,
+        open_url: &mut String,
+        git: &impl GitTrait,
+    ) -> Result<(), AppError> {
+        if path == "current-working-directory" {
+            match git.get_current_working_directory()? {
+                GitOutput::Ok(cwd) => {
+                    // If the current working directory is not the root of the repo, append it
+                    if !cwd.is_empty() {
+                        open_url.push_str(format!("{}/{}", prefix, cwd).as_str());
+                    }
+                }
+                GitOutput::Err(err) => return Err(AppError::new(ErrorType::CommandFailed, err)),
+            }
+        } else {
+            open_url.push_str(format!("{}{}", prefix, path).as_str());
+        }
+
+        // suffix can still be appended after path
+        self.handle_suffix_flag(open_url);
+
+        Ok(())
+    }
+
+    fn handle_suffix_flag(&self, open_url: &mut String) {
+        if let Some(suffix) = self.suffix {
+            open_url.push_str(format!("/{}", suffix).as_str());
+        }
+    }
 }
 
-fn capture_digits(remote_ref: &str) -> &str {
+fn capture_digits(remote_ref: &str) -> Option<&str> {
     let mut start = 0;
     let mut end = 0;
     let mut found = false;
@@ -278,9 +341,9 @@ fn capture_digits(remote_ref: &str) -> &str {
     }
 
     if found {
-        &remote_ref[start..=end]
+        Some(&remote_ref[start..=end])
     } else {
-        remote_ref
+        None
     }
 }
 
@@ -322,6 +385,7 @@ mod lib_tests {
         commit: Option<&'a str>,
         suffix: Option<&'a str>,
         issue: Option<&'a str>,
+        path: Option<&'a str>,
         is_print: bool,
     }
 
@@ -351,6 +415,11 @@ mod lib_tests {
             self
         }
 
+        pub(crate) fn with_path(mut self, path: &'a str) -> Self {
+            self.path = Some(path);
+            self
+        }
+
         pub(crate) fn build(self) -> GitView<'a> {
             GitView::new(
                 self.branch,
@@ -358,6 +427,7 @@ mod lib_tests {
                 self.commit,
                 self.suffix,
                 self.issue,
+                self.path,
                 self.is_print,
             )
         }
@@ -767,11 +837,11 @@ mod lib_tests {
         fn is_latest_commit() {
             let handler = GitView::builder().with_commit("current").build();
             let url = Url::new("https", "github.com", "sgoudham/git-view");
-            let expected_final_url = "https://github.com/sgoudham/git-view/tree/commit_hash";
+            let expected_final_url = "https://github.com/sgoudham/git-view/tree/eafdb9a";
             let mut mock = MockGitTrait::default();
 
             mock.expect_get_current_commit()
-                .returning(|| Ok(GitOutput::Ok("commit_hash".into())));
+                .returning(|| Ok(GitOutput::Ok("eafdb9a".into())));
 
             let actual_final_url = handler.generate_final_url("main", &url, &mock);
 
@@ -795,12 +865,32 @@ mod lib_tests {
             assert_eq!(actual_final_url.unwrap(), expected_final_url);
         }
 
+        #[test]
+        fn is_latest_commit_with_path_current_working_directory() {
+            let handler = GitView::builder()
+                .with_commit("current")
+                .with_path("src/main.rs")
+                .build();
+            let url = Url::new("https", "github.com", "sgoudham/git-view");
+            let expected_final_url =
+                "https://github.com/sgoudham/git-view/tree/eafdb9a/src/main.rs";
+
+            let mut mock = MockGitTrait::default();
+            mock.expect_get_current_commit()
+                .returning(|| Ok(GitOutput::Ok("eafdb9a".into())));
+
+            let actual_final_url = handler.generate_final_url("main", &url, &mock);
+
+            assert!(actual_final_url.is_ok());
+            assert_eq!(actual_final_url.unwrap(), expected_final_url);
+        }
+
         #[test_case("main" ; "main")]
         #[test_case("master" ; "master")]
         fn is_master_or_main(branch: &str) {
             let handler = GitView::default();
             let url = Url::new("https", "github.com", "sgoudham/git-view");
-            let expected_final_url = "https://github.com/sgoudham/git-view";
+            let expected_final_url = format!("https://github.com/sgoudham/git-view/tree/{branch}");
             let mock = MockGitTrait::default();
 
             let actual_final_url = handler.generate_final_url(branch, &url, &mock);
@@ -823,7 +913,6 @@ mod lib_tests {
             assert_eq!(actual_final_url.unwrap(), expected_final_url);
         }
 
-
         #[test]
         fn is_user_issue() {
             let handler = GitView::builder().with_issue("branch").build();
@@ -844,7 +933,7 @@ mod lib_tests {
             let expected_final_url = "https://github.com/sgoudham/git-view/issues/42";
             let mock = MockGitTrait::default();
 
-            let actual_final_url = handler.generate_final_url("mock ref", &url, &mock);
+            let actual_final_url = handler.generate_final_url("main", &url, &mock);
 
             assert!(actual_final_url.is_ok());
             assert_eq!(actual_final_url.unwrap(), expected_final_url);
@@ -863,10 +952,41 @@ mod lib_tests {
             assert_eq!(actual_final_url.unwrap(), expected_final_url);
         }
 
-        #[test_case("main", "https://github.com/sgoudham/git-view/releases" ; "with_branch_main")]
+        #[test]
+        fn is_user_path() {
+            let handler = GitView::builder().with_path("src/main.rs").build();
+            let url = Url::new("https", "github.com", "sgoudham/git-view");
+            let expected_final_url = "https://github.com/sgoudham/git-view/tree/main/src/main.rs";
+            let mock = MockGitTrait::default();
+
+            let actual_final_url = handler.generate_final_url("main", &url, &mock);
+
+            assert!(actual_final_url.is_ok());
+            assert_eq!(actual_final_url.unwrap(), expected_final_url);
+        }
+
+        #[test]
+        fn is_path_at_repo_root() {
+            let handler = GitView::builder()
+                .with_path("current-working-directory")
+                .build();
+            let url = Url::new("https", "github.com", "sgoudham/git-view");
+            let expected_final_url = "https://github.com/sgoudham/git-view";
+
+            let mut mock = MockGitTrait::default();
+            mock.expect_get_current_working_directory()
+                .returning(|| Ok(GitOutput::Ok("".into())));
+
+            let actual_final_url = handler.generate_final_url("main", &url, &mock);
+
+            assert!(actual_final_url.is_ok());
+            assert_eq!(actual_final_url.unwrap(), expected_final_url);
+        }
+
+        #[test_case("main", "https://github.com/sgoudham/git-view/tree/main/releases" ; "with_branch_main")]
         #[test_case("dev", "https://github.com/sgoudham/git-view/tree/dev/releases" ; "with_branch_dev")]
         fn with_suffix(remote_ref: &str, expected_final_url: &str) {
-            let handler = GitView::builder().with_suffix("/releases").build();
+            let handler = GitView::builder().with_suffix("releases").build();
             let url = Url::new("https", "github.com", "sgoudham/git-view");
             let mock = MockGitTrait::default();
 
@@ -882,7 +1002,6 @@ mod lib_tests {
 
         use crate::capture_digits;
 
-        #[test_case("TICKET-WITH-NO-NUMBERS",   "TICKET-WITH-NO-NUMBERS"    ; "with no numbers")]
         #[test_case("🥵🥵Hazel🥵-1234🥵🥵",     "1234"                      ; "with emojis")]
         #[test_case("TICKET-1234-To-V10",       "1234"                      ; "with multiple issue numbers")]
         #[test_case("TICKET-1234",              "1234"                      ; "with issue number at end")]
@@ -890,7 +1009,14 @@ mod lib_tests {
         #[test_case("1234",                     "1234"                      ; "with no letters")]
         fn branch(input: &str, expected_remote_ref: &str) {
             let actual_remote_ref = capture_digits(input);
-            assert_eq!(actual_remote_ref, expected_remote_ref);
+            assert_eq!(actual_remote_ref, Some(expected_remote_ref));
+        }
+
+        #[test]
+        fn branch_no_numbers() {
+            let input = "TICKET-WITH-NO-NUMBERS";
+            let actual_remote_ref = capture_digits(input);
+            assert_eq!(actual_remote_ref, None);
         }
     }
 

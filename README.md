@@ -14,17 +14,15 @@ Are you _**also**_ frustrated from moving your hands away from the keyboard to v
 
 `git-view` alleviates that pain by allowing you to chuck away your mouse!
 
-> (n)vim users rejoice :P
-
-**_Important Note: You should always use `git view -h` instead of `git view --help` as the manpage/html files are NOT included._**
+> **Note:** <br>
+> You should always use `git view -h` instead of `git view --help` as the manpage/html files are **NOT** included.
 
 ## Features
 
 - [x] View Branches, Commits & Issues
 - [x] Custom Suffix
 - [x] Custom Remote
-- [ ] View Profile
-- [ ] View Current Directory
+- [x] View Current Directory
 
 ## Installation
 

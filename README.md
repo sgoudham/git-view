@@ -106,7 +106,7 @@ OPTIONS:
                             [default: current commit]
     -p, --path <path>       The directory/file to view on GitHub
                             [default: current working directory]
-        --print             Don't open GitHub and print URL
+        --print             Print URL instead of opening on GitHub
     -h, --help              Print help information
     -V, --version           Print version information
 ```

@@ -71,7 +71,7 @@ fn main() {
         )
         .arg(
             Arg::new("print")
-                .long_help("Don't open GitHub and print URL")
+                .long_help("Print URL instead of opening on GitHub")
                 .long("print")
                 .display_order(6),
         );

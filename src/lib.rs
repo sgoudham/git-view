@@ -229,8 +229,8 @@ impl<'a> GitView<'a> {
             return Ok(open_url);
         }
         if let Some(path) = self.path {
-            let prefix = format!("/tree/{}/", escaped_remote_ref);
-            self.handle_path_flag(prefix.as_str(), path, &mut open_url, git)?;
+            let prefix = format!("/tree/{}", escaped_remote_ref);
+            self.handle_path_flag(Some(prefix.as_str()), path, &mut open_url, git)?;
             return Ok(open_url);
         }
 
@@ -282,7 +282,8 @@ impl<'a> GitView<'a> {
 
         // path can still be appended after commit hash
         if let Some(path) = self.path {
-            self.handle_path_flag("/", path, open_url, git)?;
+            // prefix is empty because trailing slash will be added
+            self.handle_path_flag(None, path, open_url, git)?;
         }
 
         Ok(())
@@ -290,7 +291,7 @@ impl<'a> GitView<'a> {
 
     fn handle_path_flag(
         &self,
-        prefix: &str,
+        prefix: Option<&str>,
         path: &str,
         open_url: &mut String,
         git: &impl GitTrait,
@@ -300,13 +301,15 @@ impl<'a> GitView<'a> {
                 GitOutput::Ok(cwd) => {
                     // If the current working directory is not the root of the repo, append it
                     if !cwd.is_empty() {
-                        open_url.push_str(format!("{}/{}", prefix, cwd).as_str());
+                        open_url.push_str(format!("{}/{}", prefix.unwrap(), cwd).as_str());
                     }
                 }
                 GitOutput::Err(err) => return Err(AppError::new(ErrorType::CommandFailed, err)),
             }
+        } else if let Some(prefix) = prefix {
+            open_url.push_str(format!("{}/{}", prefix, path).as_str());
         } else {
-            open_url.push_str(format!("{}{}", prefix, path).as_str());
+            open_url.push_str(format!("/{}", path).as_str());
         }
 
         // suffix can still be appended after path
@@ -976,6 +979,25 @@ mod lib_tests {
             let mut mock = MockGitTrait::default();
             mock.expect_get_current_working_directory()
                 .returning(|| Ok(GitOutput::Ok("".into())));
+
+            let actual_final_url = handler.generate_final_url("main", &url, &mock);
+
+            assert!(actual_final_url.is_ok());
+            assert_eq!(actual_final_url.unwrap(), expected_final_url);
+        }
+
+        #[test]
+        fn is_path_at_sub_directory() {
+            let handler = GitView::builder()
+                .with_path("current-working-directory")
+                .build();
+            let url = Url::new("https", "github.com", "sgoudham/git-view");
+            let expected_final_url = "https://github.com/sgoudham/git-view/tree/main/src/";
+
+            // `git rev-parse --show-prefix` returns relative path with a trailing slash
+            let mut mock = MockGitTrait::default();
+            mock.expect_get_current_working_directory()
+                .returning(|| Ok(GitOutput::Ok("src/".into())));
 
             let actual_final_url = handler.generate_final_url("main", &url, &mock);
 

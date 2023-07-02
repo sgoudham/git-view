@@ -17,11 +17,13 @@ on:
       - "src/**"
       - "Cargo.toml"
       - "Cargo.lock"
+    branches: main
   pull_request:
     paths:
       - "src/**"
       - "Cargo.toml"
       - "Cargo.lock"
+    branches: main
 
 env:
   BINARY: git-view

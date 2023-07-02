@@ -45,33 +45,47 @@ brew install git-view
 
 ```shell
 $ git view
-# View https://github.com/TRACKED_REMOTE_USER/REPO/tree/CURRENT_BRANCH
+# https://github.com/TRACKED_REMOTE_USER/REPO/tree/CURRENT_BRANCH
+
 
 $ git view --remote remote
-# View https://github.com/PROVIDED_REMOTE_USER/REPO/tree/CURRENT_BRANCH
+# https://github.com/PROVIDED_REMOTE_USER/REPO/tree/CURRENT_BRANCH
 
 $ git view --remote remote --branch branch
-# View https://github.com/PROVIDED_REMOTE_USER/REPO/tree/PROVIDED_BRANCH
-
-$ git view --commit
-# View https://github.com/TRACKED_REMOTE_USER/REPO/tree/CURRENT_COMMIT
-
-$ git view --commit efa38be50ad34d
-# View https://github.com/TRACKED_REMOTE_USER/REPO/tree/efa38be50ad34d
+# https://github.com/PROVIDED_REMOTE_USER/REPO/tree/PROVIDED_BRANCH
 
 $ git view --issue
 # Given branch 'TICKET-123' or some other variation
-# View https://github.com/TRACKED_REMOTE_USER/REPO/issues/123
+# https://github.com/TRACKED_REMOTE_USER/REPO/issues/123
 
 $ git view --issue 42
-# View https://github.com/TRACKED_REMOTE_USER/REPO/issues/42
+# https://github.com/TRACKED_REMOTE_USER/REPO/issues/42
+
+$ git view --commit
+# https://github.com/TRACKED_REMOTE_USER/REPO/tree/CURRENT_COMMIT
+
+$ git view --commit efa38be50ad34d
+# https://github.com/TRACKED_REMOTE_USER/REPO/tree/efa38be50ad34d
+
+$ git view --commit efa38be50ad34d --path src/lib.rs
+# https://github.com/TRACKED_REMOTE_USER/REPO/tree/efa38be50ad34d/src/main.rs
+
+$ git view --path
+# Given working directory 'src/lib.rs'
+# https://github.com/TRACKED_REMOTE_USER/REPO/tree/CURRENT_BRANCH/src/main.rs
+
+$ git view --path CONTRIBUTING.md
+# https://github.com/TRACKED_REMOTE_USER/REPO/tree/CURRENT_BRANCH/CONTRIBUTING.md
+
+$ git view --path CONTRIBUTING.md --branch testing
+# https://github.com/TRACKED_REMOTE_USER/REPO/tree/PROVIDED_BRANCH/CONTRIBUTING.md
 
 $ git view --suffix releases
 # Given branch 'TICKET-123' or some other variation
-# View https://github.com/TRACKED_REMOTE_USER/REPO/releases
+# https://github.com/TRACKED_REMOTE_USER/REPO/releases
 
 $ git view --print
-# Prints https://github.com/TRACKED_REMOTE_USER/REPO/tree/CURRENT_BRANCH
+# prints https://github.com/TRACKED_REMOTE_USER/REPO/tree/CURRENT_BRANCH
 ```
 
 ## Help
@@ -89,12 +103,14 @@ OPTIONS:
                              [default: default remote]
     -b, --branch <name>      The branch to view git repository on
                              [default: current branch]
+    -i, --issue <number>     The issue number to view on the git repository
+                             [default: open issue from current branch]
     -c, --commit <hash>      The commit to view git repository on
                              [default: current commit]
-    -s, --suffix <suffix>    A suffix to append onto the git repository URL
-    -i, --issue <issue>      The issue number to view
-                             [default: open issue from remote branch]
-    -p, --print              Don't open browser and print the URL
+    -p, --path <path>        The directory/file to view on the git repository
+                             [default: current working directory]
+    -s, --suffix <suffix>    A suffix to append onto the base git repository URL
+        --print              Don't open browser and print the URL
     -h, --help               Print help information
     -V, --version            Print version information
 ```

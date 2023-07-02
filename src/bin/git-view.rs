@@ -40,6 +40,7 @@ fn main() {
                 .long_help("The issue number to view on the git repository\n[default: open issue from current branch]")
                 .short('i')
                 .long("issue")
+                .value_name("number")
                 .default_missing_value("branch")
                 .conflicts_with("commit")
                 .takes_value(true)

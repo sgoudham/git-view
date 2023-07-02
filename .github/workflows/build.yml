@@ -45,7 +45,6 @@ jobs:
       fail-fast: false
       matrix:
         build:
-          - stable
           - nightly-gnu
           - nightly-musl
           - nightly-32
@@ -54,9 +53,6 @@ jobs:
           - win-msvc
           - win-gnu
         include:
-          - build: stable
-            os: ubuntu-22.04
-            rust: stable
           - build: nightly-gnu
             os: ubuntu-22.04
             rust: nightly

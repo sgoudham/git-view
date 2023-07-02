@@ -36,6 +36,12 @@ Binaries are available [here](https://github.com/sgoudham/git-view/releases/late
 cargo install git-view
 ```
 
+### Nix
+
+```shell
+nix run github:sgoudham/git-view
+```
+
 ### Homebrew
 
 ```shell

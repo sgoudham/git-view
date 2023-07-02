@@ -46,7 +46,6 @@ brew install git-view
 $ git view
 # https://github.com/TRACKED_REMOTE_USER/REPO/tree/CURRENT_BRANCH
 
-
 $ git view --remote remote
 # https://github.com/PROVIDED_REMOTE_USER/REPO/tree/CURRENT_BRANCH
 

@@ -1,10 +1,13 @@
-# git-view
+<h1 align="center">
+    git-view (
+    <a href="https://github.com/sgoudham/git-view/actions/workflows/build.yml"><img src="https://github.com/sgoudham/git-view/actions/workflows/build.yml/badge.svg"></a> )
+</h1>
 
-[![build](https://github.com/sgoudham/git-view/actions/workflows/build.yml/badge.svg)](https://github.com/sgoudham/git-view/actions/workflows/build.yml)
-[![crates.io](https://img.shields.io/crates/v/git-view)](https://crates.io/crates/git-view)
-[![downloads](https://img.shields.io/crates/d/git-view)](https://crates.io/crates/git-view)
-
-> A git sub-command to view your git repository on GitHub!
+<p align="center">
+    <a href="https://github.com/sgoudham/git-view/stargazers"><img src="https://img.shields.io/github/stars/sgoudham/git-view?colorA=363a4f&colorB=b7bdf8&style=for-the-badge"></a>
+	<a href="https://crates.io/crates/git-view"><img src="https://img.shields.io/crates/v/git-view?colorA=363a4f&colorB=ee99a0&style=for-the-badge"></a>
+	<a href="https://crates.io/crates/git-view"><img src="https://img.shields.io/crates/d/git-view?colorA=363a4f&colorB=eed49f&style=for-the-badge"></a>
+</p>
 
 ## About
 
@@ -12,7 +15,7 @@ Are you _**also**_ frustrated from moving your hands away from the keyboard to v
 
 > Me too!!!
 
-`git-view` alleviates that pain by allowing you to chuck away your mouse!
+`git-view` alleviates that pain by allowing you to chuck away your mouse and instead open it via the CLI!
 
 > **Note:** <br>
 > You should always use `git view -h` instead of `git view --help` as the manpage/html files are **NOT** included.
@@ -53,7 +56,7 @@ $ git view --remote remote --branch branch
 # https://github.com/PROVIDED_REMOTE_USER/REPO/tree/PROVIDED_BRANCH
 
 $ git view --issue
-# Given branch 'TICKET-123' or some other variation
+# Branch 'TICKET-123'
 # https://github.com/TRACKED_REMOTE_USER/REPO/issues/123
 
 $ git view --issue 42
@@ -66,11 +69,11 @@ $ git view --commit efa38be50ad34d
 # https://github.com/TRACKED_REMOTE_USER/REPO/tree/efa38be50ad34d
 
 $ git view --commit efa38be50ad34d --path src/lib.rs
-# https://github.com/TRACKED_REMOTE_USER/REPO/tree/efa38be50ad34d/src/main.rs
+# https://github.com/TRACKED_REMOTE_USER/REPO/tree/efa38be50ad34d/src/lib.rs
 
 $ git view --path
-# Given working directory 'src/lib.rs'
-# https://github.com/TRACKED_REMOTE_USER/REPO/tree/CURRENT_BRANCH/src/main.rs
+# Working Directory 'src/lib.rs'
+# https://github.com/TRACKED_REMOTE_USER/REPO/tree/CURRENT_BRANCH/src/lib.rs
 
 $ git view --path CONTRIBUTING.md
 # https://github.com/TRACKED_REMOTE_USER/REPO/tree/CURRENT_BRANCH/CONTRIBUTING.md

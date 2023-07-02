@@ -13,7 +13,6 @@ pub struct GitView<'a> {
     remote: Option<&'a str>,
     branch: Option<&'a str>,
     commit: Option<&'a str>,
-    suffix: Option<&'a str>,
     issue: Option<&'a str>,
     path: Option<&'a str>,
     is_print: bool,
@@ -24,7 +23,6 @@ impl<'a> GitView<'a> {
         branch: Option<&'a str>,
         remote: Option<&'a str>,
         commit: Option<&'a str>,
-        suffix: Option<&'a str>,
         issue: Option<&'a str>,
         path: Option<&'a str>,
         is_print: bool,
@@ -33,7 +31,6 @@ impl<'a> GitView<'a> {
             remote,
             branch,
             commit,
-            suffix,
             issue,
             path,
             is_print,
@@ -234,9 +231,7 @@ impl<'a> GitView<'a> {
             return Ok(open_url);
         }
 
-        println!("{escaped_remote_ref}");
         open_url.push_str(format!("/tree/{}", escaped_remote_ref).as_str());
-        self.handle_suffix_flag(&mut open_url);
 
         Ok(open_url)
     }
@@ -256,9 +251,6 @@ impl<'a> GitView<'a> {
         } else {
             open_url.push_str(format!("/issues/{}", issue).as_str());
         }
-
-        // no reason why suffix can't be appended after issue
-        self.handle_suffix_flag(open_url);
 
         Ok(())
     }
@@ -312,16 +304,7 @@ impl<'a> GitView<'a> {
             open_url.push_str(format!("/{}", path).as_str());
         }
 
-        // suffix can still be appended after path
-        self.handle_suffix_flag(open_url);
-
         Ok(())
-    }
-
-    fn handle_suffix_flag(&self, open_url: &mut String) {
-        if let Some(suffix) = self.suffix {
-            open_url.push_str(format!("/{}", suffix).as_str());
-        }
     }
 }
 
@@ -386,7 +369,6 @@ mod lib_tests {
         remote: Option<&'a str>,
         branch: Option<&'a str>,
         commit: Option<&'a str>,
-        suffix: Option<&'a str>,
         issue: Option<&'a str>,
         path: Option<&'a str>,
         is_print: bool,
@@ -408,11 +390,6 @@ mod lib_tests {
             self
         }
 
-        pub(crate) fn with_suffix(mut self, suffix: &'a str) -> Self {
-            self.suffix = Some(suffix);
-            self
-        }
-
         pub(crate) fn with_issue(mut self, issue: &'a str) -> Self {
             self.issue = Some(issue);
             self
@@ -428,7 +405,6 @@ mod lib_tests {
                 self.branch,
                 self.remote,
                 self.commit,
-                self.suffix,
                 self.issue,
                 self.path,
                 self.is_print,
@@ -1000,19 +976,6 @@ mod lib_tests {
                 .returning(|| Ok(GitOutput::Ok("src/".into())));
 
             let actual_final_url = handler.generate_final_url("main", &url, &mock);
-
-            assert!(actual_final_url.is_ok());
-            assert_eq!(actual_final_url.unwrap(), expected_final_url);
-        }
-
-        #[test_case("main", "https://github.com/sgoudham/git-view/tree/main/releases" ; "with_branch_main")]
-        #[test_case("dev", "https://github.com/sgoudham/git-view/tree/dev/releases" ; "with_branch_dev")]
-        fn with_suffix(remote_ref: &str, expected_final_url: &str) {
-            let handler = GitView::builder().with_suffix("releases").build();
-            let url = Url::new("https", "github.com", "sgoudham/git-view");
-            let mock = MockGitTrait::default();
-
-            let actual_final_url = handler.generate_final_url(remote_ref, &url, &mock);
 
             assert!(actual_final_url.is_ok());
             assert_eq!(actual_final_url.unwrap(), expected_final_url);

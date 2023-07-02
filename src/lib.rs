@@ -122,10 +122,13 @@ impl<'a> GitView<'a> {
                     )),
                     // Upstream branch doesn't exist, try to retrieve default remote branch
                     GitOutput::Err(_) => match git.get_default_branch(remote)? {
-                        GitOutput::Ok(default_branch) => match default_branch.split_once('/') {
-                            Some((_, split_branch)) => Ok(Cow::Owned(split_branch.into())),
-                            None => Ok(Cow::Borrowed(branch)),
-                        },
+                        GitOutput::Ok(default_branch) => {
+                            println!("Cannot verify '{remote}/{branch}' exists, defaulting to '{default_branch}'");
+                            return match default_branch.split_once('/') {
+                                Some((_, split_branch)) => Ok(Cow::Owned(split_branch.into())),
+                                None => Ok(Cow::Borrowed(branch)),
+                            };
+                        }
                         // Default branch couldn't be retrieved, just use the local branch
                         // (this WILL result in a 404 error on the user but better than failing?)
                         GitOutput::Err(_) => Ok(Cow::Borrowed(branch)),

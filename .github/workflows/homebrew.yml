@@ -1,4 +1,4 @@
-name: bump-homebrew-formula
+name: Bump Homebrew
 
 on:
   workflow_dispatch:

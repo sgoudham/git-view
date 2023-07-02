@@ -1,169 +1,175 @@
-name: deploy
+# Copyright (c) 2023 Hamothy
+# Copyright (c) 2015 Andrew Gallant
 
-on:
-  push:
-    # Sequence of patterns matched against refs/tags
-    tags:
-      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-env:
-  bin: git-view
+  name: release
 
-jobs:
-  windows:
-    runs-on: windows-latest
-    strategy:
-      matrix:
-        target:
-          - x86_64-pc-windows-gnu
-          - x86_64-pc-windows-msvc
+  on:
+    push:
+      tags:
+        - "v*"
+  
+  env:
+    BINARY: git-view
+  
+  jobs:
+    build-release:
+      runs-on: ${{ matrix.os }}
+      defaults:
+        run:
+          shell: bash
+      env:
+        CARGO: cargo
+        # When CARGO is set to CROSS, this is set to `--target matrix.target`.
+        TARGET_FLAGS:
+        # When CARGO is set to CROSS, TARGET_DIR includes matrix.target.
+        TARGET_DIR: ./target
+        # Emit backtraces on panics.
+        RUST_BACKTRACE: 1
+      strategy:
+        fail-fast: false
+        matrix:
+          build:
+            [linux, linux-gnu, linux-arm, macos, win-msvc, win-gnu, win32-msvc]
+          include:
+            - build: linux
+              os: ubuntu-22.04
+              rust: nightly
+              target: x86_64-unknown-linux-musl
+            - build: linux-gnu
+              os: ubuntu-22.04
+              rust: nightly
+              target: x86_64-unknown-linux-gnu
+            - build: linux-arm
+              os: ubuntu-22.04
+              rust: nightly
+              target: arm-unknown-linux-gnueabihf
+            - build: macos
+              os: macos-12
+              rust: nightly
+              target: x86_64-apple-darwin
+            - build: win-msvc
+              os: windows-2022
+              rust: nightly
+              target: x86_64-pc-windows-msvc
+            - build: win-gnu
+              os: windows-2022
+              rust: nightly-x86_64-gnu
+              target: x86_64-pc-windows-gnu
+            - build: win32-msvc
+              os: windows-2022
+              rust: nightly
+              target: i686-pc-windows-msvc
+  
+      steps:
+        - name: Checkout repository
+          uses: actions/checkout@v3
+  
+        - name: Install packages (Ubuntu)
+          if: matrix.os == 'ubuntu-22.04'
+          run: sudo apt-get update && sudo apt-get install -y --no-install-recommends musl-tools
+  
+        - name: Install Rust
+          uses: dtolnay/rust-toolchain@master
+          with:
+            toolchain: ${{ matrix.rust }}
+            target: ${{ matrix.target }}
+  
+        - name: Cache Rust
+          uses: Swatinem/rust-cache@v2
+          with:
+            key: ${{ matrix.rust }}
+  
+        - name: Use Cross
+          if: matrix.os != 'windows-2022'
+          run: |
+            cargo install cross
+            echo "CARGO=cross" >> $GITHUB_ENV
+            echo "TARGET_FLAGS=--target ${{ matrix.target }}" >> $GITHUB_ENV
+            echo "TARGET_DIR=./target/${{ matrix.target }}" >> $GITHUB_ENV
+  
+        - name: Show command used for Cargo
+          run: |
+            echo "cargo command is: ${{ env.CARGO }}"
+            echo "target flag is: ${{ env.TARGET_FLAGS }}"
+            echo "target dir is: ${{ env.TARGET_DIR }}"
+  
+        - name: Compile
+          run: ${{ env.CARGO }} build --release --verbose ${{ env.TARGET_FLAGS }}
+  
+        - name: Strip release binary (linux and macos)
+          if: matrix.build == 'linux' || matrix.build == 'linux-gnu' || matrix.build == 'macos'
+          run: strip "target/${{ matrix.target }}/release/${{ env.BINARY }}"
+  
+        - name: Strip release binary (arm)
+          if: matrix.build == 'linux-arm'
+          run: |
+            docker run --rm -v \
+              "$PWD/target:/target:Z" \
+              rustembedded/cross:arm-unknown-linux-gnueabihf \
+              arm-linux-gnueabihf-strip \
+              /target/arm-unknown-linux-gnueabihf/release/${{ env.BINARY }}
+        
+        - name: Zip Artifact
+          id: zip-artifact
+          run: |
+            staging="${{ env.BINARY }}-${{ matrix.target }}"
+            mkdir "$staging"
 
-    steps:
-      - uses: actions/checkout@v3
-      - name: Cache Cargo
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ./target
-          # Example key: windows-stable-x86_64-pc-windows-gnu-3k4j234lksjfd9
-          key: windows-stable-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            windows-stable-${{ matrix.target }}-
-            windows-stable-
-            windows-
-      - name: Set Rust Channel
-        run: rustup default stable
-        shell: bash
-      - name: Set Rust Target
-        run: rustup target add ${{ matrix.target }}
-        shell: bash
-      - name: Build Release Binary
-        run: cargo build --target ${{ matrix.target }} --release
-        shell: bash
-      - name: Compress Windows Binary
-        run: |
-          cd ./target/${{ matrix.target }}/release/
-          7z a "${{ env.bin }}-${{ matrix.target }}.zip" "${{ env.bin }}.exe"
-          mv "${{ env.bin }}-${{ matrix.target }}.zip" $GITHUB_WORKSPACE
-        shell: bash
-      - name: Archive Windows Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: Windows
-          path: |
-            ${{ github.workspace }}/${{ env.bin }}-${{ matrix.target }}.zip
+            if [ "${{ matrix.os }}" == "windows-2022" ]; then
+              cp "${{ env.TARGET_DIR }}/release/${{ env.BINARY }}.exe" "$staging/"
+              7z a "$staging.zip" "$staging"
+              echo "asset=$staging.zip" >> $GITHUB_OUTPUT
+            else
+              cp "${{ env.TARGET_DIR }}/release/${{ env.BINARY }}" "$staging/"
+              tar czf "$staging.tar.gz" "$staging"
+              echo "asset=$staging.tar.gz" >> $GITHUB_OUTPUT
+            fi
 
-  macos:
-    runs-on: macos-latest
-    strategy:
-      matrix:
-        target:
-          - x86_64-apple-darwin
+        - name: Upload Artifact
+          uses: actions/upload-artifact@v3
+          with:
+            name: ${{ env.BINARY }}-${{ matrix.build }}
+            path: ${{ steps.zip-artifact.outputs.asset }}
 
-    steps:
-      - uses: actions/checkout@v3
-      - name: Cache Cargo
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ./target
-          # Example key: macos-stable-x86_64-apple-darwin-3k4j234lksjfd9
-          key: macos-stable-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            macos-stable-${{ matrix.target }}-
-            macos-stable-
-            macos-
-      - name: Set Rust Channel
-        run: rustup default stable 
-      - name: Set Rust Target
-        run: rustup target add ${{ matrix.target }}
-      - name: Build Release Binary
-        run: cargo build --target ${{ matrix.target }} --release
-      - name: Compress macOS Binary
-        run: tar -czvf ${{ env.bin }}-${{ matrix.target }}.tar.gz --directory=target/${{ matrix.target }}/release ${{ env.bin }}
-      - name: Archive macOS Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: macOS
-          path: |
-            ./${{ env.bin }}-${{ matrix.target }}.tar.gz
+    create-release:
+      needs: build-release
+      runs-on: ubuntu-22.04
+      steps:
+        - name: Download Artifacts
+          uses: actions/download-artifact@v3
+        - name: Display Directory Structure
+          run: ls -R
+        - name: Create Release
+          uses: softprops/action-gh-release@v1
+          with:
+            generate_release_notes: true
+            files: |
+              ./${{ env.BINARY }}-*/*.tar.gz
+              ./${{ env.BINARY }}-*/*.zip
 
-  linux:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - x86_64-unknown-linux-musl
-
-    steps:
-      - uses: actions/checkout@v3
-      - name: Cache Cargo
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ./target
-          # Example key: linux-stable-x86_64-unknown-linux-gnu-3k4j234lksjfd9
-          key: linux-stable-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            linux-stable-${{ matrix.target }}-
-            linux-stable-
-            linux-
-      - name: Set Rust Channel
-        run: rustup default stable 
-      - name: Set Rust Target
-        run: rustup target add ${{ matrix.target }}
-      - name: Build Release Binary
-        run: cargo build --target ${{ matrix.target }} --release
-      - name: Compress Linux Binary
-        run: tar -czvf ${{ env.bin }}-${{ matrix.target }}.tar.gz --directory=target/${{ matrix.target }}/release ${{ env.bin }}
-      - name: Archive Linux Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: Linux
-          path: |
-            ./${{ env.bin }}-${{ matrix.target }}.tar.gz
-
-  deploy-artifacts:
-    name: Deploy Artifacts
-    needs: [ windows, macos, linux ]
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Download Artifacts
-        uses: actions/download-artifact@v3
-      - name: Display Structure
-        run: ls -R
-      - name: Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            ./Linux/*.tar.gz
-            ./macOS/*.tar.gz
-            ./Windows/*.zip
-
-  homebrew:
-    name: Bump Homebrew Formula
-    needs: deploy-artifacts
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Extract Version
-        run: printf "::set-output name=%s::%s\n" tag-name "${GITHUB_REF#refs/tags/}"
-      - uses: mislav/bump-homebrew-formula-action@v2
-        if: "!contains(github.ref, '-')" # Skip Pre-Releases
-        with:
-          create-pullrequest: true
-          formula-name: ${{ env.bin }}
-          formula-path: Formula/${{ env.bin }}.rb
-          homebrew-tap: sgoudham/homebrew-tap
-          download-url: https://github.com/sgoudham/${{ env.bin }}/releases/download/${{ steps.extract-version.outputs.tag-name }}/${{ env.bin }}-x86_64-apple-darwin.tar.gz
-          commit-message: |
-            {{formulaName}} -> {{version}}
-            
-            Created by https://github.com/mislav/bump-homebrew-formula-action
-        env:
-          COMMITTER_TOKEN: ${{ secrets.HOMEBREW }}
+    homebrew:
+      name: Bump Homebrew Formula
+      needs: create-release
+      runs-on: ubuntu-22.04
+      steps:
+        - uses: mislav/bump-homebrew-formula-action@v2
+          if: !github.event.release.prerelease
+          with:
+            create-pullrequest: true
+            formula-name: ${{ env.BINARY }}
+            formula-path: Formula/${{ env.BINARY }}.rb
+            homebrew-tap: sgoudham/homebrew-tap
+            download-url: https://github.com/sgoudham/${{ env.BINARY }}/releases/download/${{ github.ref_name }}/${{ env.BINARY }}-x86_64-apple-darwin.tar.gz
+            commit-message: |
+              {{formulaName}} -> {{version}}
+              
+              Created by https://github.com/mislav/bump-homebrew-formula-action
+          env:
+            COMMITTER_TOKEN: ${{ secrets.HOMEBREW }}

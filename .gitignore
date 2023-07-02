@@ -8,3 +8,5 @@
 
 # Ignore intellij folder
 .idea
+# Ignore VsCode settings
+.vscode

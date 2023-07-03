@@ -132,7 +132,7 @@ impl<'a> GitView<'a> {
                         GitOutput::Err(_) => Err(AppError::new(
                             ErrorType::MissingDefaultBranch,
                             format!("Could not verify '{remote}/{branch}' exists and could not retrieve default branch")
-                        )), 
+                        )),
                     },
                 }
             }

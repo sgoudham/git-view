@@ -17,7 +17,7 @@ Are you _**also**_ frustrated from moving your hands away from the keyboard to v
 
 `git-view` alleviates that pain by allowing you to chuck away your mouse and instead open it via the CLI!
 
-> **Note:**  
+> **Note**:  
 > You should always use `git view -h` instead of `git view --help` as the manpage/html files are **NOT** included.
 
 ## Features

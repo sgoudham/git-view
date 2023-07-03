@@ -42,9 +42,7 @@
 
       packages.default = git-view;
       apps.default = flake-utils.lib.mkApp {
-        drv = git-view.overrideAttrs (finalAttrs: previousAttrs: {
-          name = "git-view";
-        });
+        drv = git-view;
       };
 
       devShells.default = pkgs.mkShell {

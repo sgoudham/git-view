@@ -32,7 +32,6 @@
       rustTarget = pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
       craneLib = (crane.mkLib pkgs).overrideToolchain rustTarget;
       git-view = craneLib.buildPackage {
-        name = "git-view";
         src = craneLib.cleanCargoSource (craneLib.path ./.);
         buildInputs = [] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [pkgs.libiconv];
       };
@@ -43,7 +42,9 @@
 
       packages.default = git-view;
       apps.default = flake-utils.lib.mkApp {
-        drv = git-view;
+        drv = git-view.overrideAttrs (finalAttrs: previousAttrs: {
+          name = "git-view";
+        });
       };
 
       devShells.default = pkgs.mkShell {

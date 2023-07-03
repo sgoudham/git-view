@@ -129,9 +129,10 @@ impl<'a> GitView<'a> {
                                 None => Ok(Cow::Borrowed(branch)),
                             };
                         }
-                        // Default branch couldn't be retrieved, just use the local branch
-                        // (this WILL result in a 404 error on the user but better than failing?)
-                        GitOutput::Err(_) => Ok(Cow::Borrowed(branch)),
+                        GitOutput::Err(_) => Err(AppError::new(
+                            ErrorType::MissingDefaultBranch,
+                            format!("Could not verify '{remote}/{branch}' exists and could not retrieve default branch")
+                        )), 
                     },
                 }
             }
@@ -633,7 +634,7 @@ mod lib_tests {
         #[test]
         fn is_branch_and_fail_to_get_default() {
             let handler = GitView::default();
-            let local = Local::Branch(Cow::Borrowed("main"));
+            let local = Local::Branch(Cow::Borrowed("testing"));
             let mut mock = MockGitTrait::default();
 
             mock.expect_get_upstream_branch()
@@ -643,8 +644,11 @@ mod lib_tests {
 
             let actual_upstream_branch = handler.get_remote_reference(&local, "origin", &mock);
 
-            assert!(actual_upstream_branch.is_ok());
-            assert_eq!(actual_upstream_branch.unwrap(), "main")
+            assert!(actual_upstream_branch.is_err());
+            assert_eq!(
+                actual_upstream_branch.unwrap_err().error_str,
+                "Could not verify 'origin/testing' exists and could not retrieve default branch"
+            );
         }
 
         #[test]

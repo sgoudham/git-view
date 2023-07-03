@@ -4,6 +4,7 @@ pub enum ErrorType {
     CommandError,
     MissingGitRepository,
     MissingGitRemote,
+    MissingDefaultBranch,
     InvalidGitUrl,
     InvalidUtf8,
     IOError,

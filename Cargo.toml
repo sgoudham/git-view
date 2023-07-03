@@ -7,6 +7,8 @@ description = "A git sub-command to view your git repository on GitHub"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/sgoudham/git-view"
+keywords = ["git", "github", "cli", "browser"]
+categories = ["command-line-utilities"]
 include = [ "/src", "/README.md", "/LICENSE" ]
 
 [[bin]]

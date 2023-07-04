@@ -1,0 +1,76 @@
+# git-cliff ~ default configuration file
+# https://git-cliff.org/docs/configuration
+#
+# Lines starting with "#" are comments.
+# Configuration options are organized into tables and keys.
+# See documentation for more information on available options.
+
+[changelog]
+header = """
+# CHANGELOG\n
+All notable changes to this project will be documented in this file.\n
+"""
+# https://tera.netlify.app/docs/#introduction
+body = """
+{% if version -%}
+    ## [{{ version }}](https://github.com/sgoudham/git-view/releases/tag/{{ version }}) - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}
+    ## [Unreleased]
+{% endif %}
+
+{% for group, commits in commits | group_by(attribute="group") -%}
+    ### {{ group | striptags | trim | upper_first }}\n
+    {% for commit in commits | filter(attribute="scope") | sort(attribute="scope") -%}
+      - ({{ commit.scope }}): {{ commit.message | upper_first }} ({{ commit.id | truncate(length=7, end="") }})
+        {%- if commit.breaking %}
+          {% for line in commit.breaking_description | split(pat="\n") %}
+            {% raw %}  {% endraw %}> {{ line }}
+          {%- endfor %}\n
+        {% endif %}
+    {% endfor -%}
+
+    {%- for commit in commits %}
+      {%- if commit.scope -%}
+      {% else -%}
+        - {{ commit.message | upper_first }} ({{ commit.id | truncate(length=7, end="") }})
+        {%- if commit.breaking %}
+          {% for line in commit.breaking_description | split(pat="\n") %}
+            {% raw %}  {% endraw %}> {{ line }}
+          {%- endfor %}
+        {% endif %}
+      {% endif -%}
+    {% endfor -%}
+
+    {% raw %}\n{% endraw %}
+{% endfor %}\n
+"""
+postprocessors = [
+  { pattern = "\\(#([0-9]+)\\)", replace = "([#${1}](https://github.com/sgoudham/git-view/issues/${1}))"},
+  { pattern = "([a-f0-9]{7})", replace = "[${1}](https://github.com/sgoudham/git-view/commit/${1})"}
+]
+
+[git]
+# regex for parsing and grouping commits
+commit_parsers = [
+  { message = ".*!", group = "<!-- 0 -->**Breaking Changes**" },
+  { message = "^feat", group = "<!-- 1 -->Features" },
+  { message = "^fix", group = "<!-- 2 -->Bug Fixes" },
+  { message = "^refactor", group = "<!-- 3 -->Refactor" },
+  { message = "^docs", group = "<!-- 4 -->Documentation" },
+  { message = "^test", group = "<!-- 5 -->Testing" },
+  { message = "^perf", group = "<!-- 6 -->Performance" },
+  { message = "^build", group = "<!-- 7 -->Build" },
+  { message = "^ci", group = "<!-- 7 -->Deployment" },
+  { message = "^chore", group = "<!-- 8 -->Miscellaneous Tasks" },
+  { body = ".*security", group = "Security" },
+]
+# protect breaking changes from being skipped due to matching a skipping commit_parser
+protect_breaking_commits = false
+# filter out the commits that are not matched by commit parsers
+filter_commits = true
+# glob pattern for matching git tags
+tag_pattern = "v[0-9]*"
+# sort the tags topologically
+topo_order = false
+# sort the commits inside sections by oldest/newest order
+sort_commits = "newest"

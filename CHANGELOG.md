@@ -2,20 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-
-## [Unreleased]
-
-
-### Refactor
-
-- (nix): Follow inputs for `crane` ([f486dd1](https://github.com/sgoudham/git-view/commit/f486dd1))
-- (nix): Remove `overrideAttrs` ([99f8735](https://github.com/sgoudham/git-view/commit/99f8735))
-- (nix): Try using `overrideAttrs` ([d5875b5](https://github.com/sgoudham/git-view/commit/d5875b5))
-- (nix): Try adding `name` ([24afcec](https://github.com/sgoudham/git-view/commit/24afcec))
-
-
-
-## [v1.0.0](https://github.com/sgoudham/git-view/releases/tag/v1.0.0) - 2023-07-03
+## [v1.0.0](https://github.com/sgoudham/git-view/releases/tag/v1.0.0) - 2023-07-04
 
 
 ### **Breaking Changes**
@@ -52,6 +39,7 @@ All notable changes to this project will be documented in this file.
 
 ### Bug Fixes
 
+- (nix): 4th July nightly isn't available yet ([f959a91](https://github.com/sgoudham/git-view/commit/f959a91))
 - Potentially solve build errors ([436b03f](https://github.com/sgoudham/git-view/commit/436b03f))
 - Stop triggering workflow twice ([1e07be9](https://github.com/sgoudham/git-view/commit/1e07be9))
 - Remove '--issue 256' example from usage.png ([1a3f4c8](https://github.com/sgoudham/git-view/commit/1a3f4c8))
@@ -59,6 +47,11 @@ All notable changes to this project will be documented in this file.
 
 ### Refactor
 
+- (nix): Pin nightly and use in `nix develop` ([21f646c](https://github.com/sgoudham/git-view/commit/21f646c))
+- (nix): Follow inputs for `crane` ([f486dd1](https://github.com/sgoudham/git-view/commit/f486dd1))
+- (nix): Remove `overrideAttrs` ([99f8735](https://github.com/sgoudham/git-view/commit/99f8735))
+- (nix): Try using `overrideAttrs` ([d5875b5](https://github.com/sgoudham/git-view/commit/d5875b5))
+- (nix): Try adding `name` ([24afcec](https://github.com/sgoudham/git-view/commit/24afcec))
 - (nix): Use rust-toolchain.toml ([75446b8](https://github.com/sgoudham/git-view/commit/75446b8))
 - Add info message for `--branch` ([11d7470](https://github.com/sgoudham/git-view/commit/11d7470))
 - `--print` help message ([a6cfa67](https://github.com/sgoudham/git-view/commit/a6cfa67))

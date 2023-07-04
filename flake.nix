@@ -51,8 +51,7 @@
         name = "rust-shell";
         inputsFrom = builtins.attrValues self.checks.${system};
         nativeBuildInputs = with pkgs; [
-          cargo
-          rustc
+          rustTarget
           # The `postprocessors` key hasn't been released yet.
           (git-cliff.overrideAttrs
             (drv: rec {

@@ -17,6 +17,7 @@ jobs:
     steps:
       - uses: mislav/bump-homebrew-formula-action@v2
         with:
+          homebrew-tap: sgoudham/homebrew-tap
           create-pullrequest: true
           formula-name: ${{ env.bin }}
           formula-path: Formula/${{ env.bin }}.rb
